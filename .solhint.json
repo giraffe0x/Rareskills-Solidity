@@ -10,6 +10,7 @@
     "no-console": "off",
     "not-rely-on-time": "off",
     "one-contract-per-file": "off",
-    "no-empty-blocks": "off"
+    "no-empty-blocks": "off",
+    "no-complex-fallback": "off"
   }
 }
