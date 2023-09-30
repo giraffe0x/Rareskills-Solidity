@@ -7,7 +7,8 @@
     "url": "https://github.com/chewonithard"
   },
   "devDependencies": {
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "@openzeppelin/contracts": "^4.9.3"
   },
   "keywords": [
     "blockchain",
