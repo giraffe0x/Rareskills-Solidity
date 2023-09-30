@@ -1,2 +1,4 @@
-@prb/test/=lib/prb-test/src/
+ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
+@openzeppelin/=node_modules/@openzeppelin/
+
