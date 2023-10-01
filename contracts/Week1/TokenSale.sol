@@ -3,6 +3,7 @@ pragma solidity 0.8.21;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC1363 } from "../tokens/IERC1363.sol";
+import { IERC1363Receiver } from "../tokens/IERC1363Receiver.sol";
 import { BancorFormula } from "../utils/BancorFormula.sol";
 
 contract TokenSale is BancorFormula, ERC20 {
@@ -80,13 +81,14 @@ contract TokenSale is BancorFormula, ERC20 {
     return reserveBalance * 1e18 / (totalSupply() * reserveRatio);
   }
 
-  // ERC1363: onTransferReceived(_msgSender(), sender, amount, data)
-
-  // fallback(bytes calldata) external payable returns(bytes memory) {
-  //   // if else for ERC1363 and ERC777, check function selector
-  //   (, address sender, uint256 amount, ) = abi.decode(msg.data, (address, address, uint256, bytes));
-  //   _depositAndMint(sender, amount);
-
-    // return bytes4(keccak256("balanceOf(address)"));
-  // }
+  function onTransferReceived(
+    address operator,
+    address from,
+    uint256 amount,
+    bytes calldata data
+  ) external returns (bytes4) {
+    require(msg.sender == daiERC1363, "Only DAI accepted");
+    _continuousMint(from, amount);
+    return IERC1363Receiver.onTransferReceived.selector;
+  }
 }

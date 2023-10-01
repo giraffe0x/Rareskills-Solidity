@@ -95,4 +95,15 @@ contract TokenSaleTest is Test {
 
     assertGt(token.balanceOf(buyer1), buyer1InitBalance);
   }
+
+  function test_ERC1363Deposit() external {
+    vm.startPrank(buyer1);
+
+    uint256 depositAmt = 1e18;
+    uint256 n = tokenSale.calculateMintAmount(depositAmt);
+    token.transferAndCall(address(tokenSale), depositAmt, "");
+
+    assertEq(token.balanceOf(address(tokenSale)), depositAmt);
+    assertEq(tokenSale.balanceOf(buyer1), n);
+  }
 }
