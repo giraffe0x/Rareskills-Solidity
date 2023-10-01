@@ -23,6 +23,9 @@ contract UntrustedEscrow {
     token = _token;
   }
 
+  /// Deposits `amount` of `token` into the escrow.
+  /// @dev Only `buyer` can call this method.
+  /// @param amount The amount of `token` to deposit.
   function deposit(uint256 amount) external {
     require(msg.sender == buyer, "Only buyer can call this method");
     startTimestamp = block.timestamp;
@@ -32,6 +35,8 @@ contract UntrustedEscrow {
     emit Deposit(buyer, amount);
   }
 
+  /// Withdraws all `token` from the escrow.
+  /// @dev Only `seller` can call this method after `TIMELOCK` has passed.
   function withdraw() external {
     require(msg.sender == seller, "Only seller can call this method");
     require(block.timestamp >= startTimestamp + TIMELOCK, "Timelock not expired");
@@ -41,6 +46,8 @@ contract UntrustedEscrow {
     emit Withdraw(seller, IERC20(token).balanceOf(address(this)));
   }
 
+  /// Cancels the escrow and returns all `token` to `buyer`.
+  /// @dev Only `buyer` can call this method.
   function cancel() external {
     require(msg.sender == buyer, "Only buyer can call this method");
 
