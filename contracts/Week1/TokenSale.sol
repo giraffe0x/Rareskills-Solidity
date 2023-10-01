@@ -21,7 +21,7 @@ contract TokenSale is BancorFormula, ERC20 {
     _mint(msg.sender, 1 * scale);
   }
 
-  /// @dev Mints tokens to the caller.
+  /// @notice Mints tokens to the caller.
   /// @param amount The amount of DAI to deposit.
   function mint(uint256 amount) external {
     require(amount > 0, "Amount must be greater than 0");
@@ -32,7 +32,7 @@ contract TokenSale is BancorFormula, ERC20 {
     _continuousMint(msg.sender, amount);
   }
 
-  /// @dev Burns tokens from the caller.
+  /// @notice Burns tokens from the caller.
   /// @param amount The amount of tokens to burn.
   function burn(uint256 amount) external {
     require(amount > 0, "Amount must be greater than 0");
@@ -41,7 +41,7 @@ contract TokenSale is BancorFormula, ERC20 {
     _continuousBurn(msg.sender, amount);
   }
 
-  /// @dev Internal function to calculate amount of tokens to mint and
+  /// @notice Internal function to calculate amount of tokens to mint and
   ///      transfer them to `to`.
   /// @param to The address to mint tokens to.
   /// @param amount The amount of DAI deposited.
@@ -53,7 +53,7 @@ contract TokenSale is BancorFormula, ERC20 {
     emit Mint(to, mintAmount);
   }
 
-  /// @dev Internal function to calculate amount of tokens to return
+  /// @notice Internal function to calculate amount of tokens to return
   ///      and burn them from `from`.
   /// @param from The address to burn tokens from.
   /// @param amount The amount of tokens to burn.
@@ -68,7 +68,7 @@ contract TokenSale is BancorFormula, ERC20 {
     emit Burn(from, amount);
   }
 
-  /// @dev Calculates the amount of tokens to mint using Bancor formula
+  /// @notice Calculates the amount of tokens to mint using Bancor formula
   /// @param amount The amount of DAI deposited.
   function calculateMintAmount(uint256 amount) public view returns (uint256) {
     uint256 mintAmount = purchaseTargetAmount(
@@ -80,7 +80,7 @@ contract TokenSale is BancorFormula, ERC20 {
     return mintAmount;
   }
 
-  /// @dev Calculates the amount of tokens to return using Bancor formula
+  /// @notice Calculates the amount of tokens to return using Bancor formula
   /// @param amount The amount of tokens to burn.
   function calculateBurnAmount(uint256 amount) public view returns (uint256) {
     uint256 returnAmount = saleTargetAmount(
@@ -92,12 +92,12 @@ contract TokenSale is BancorFormula, ERC20 {
     return returnAmount;
   }
 
-  /// @dev Calculates the price of the token in DAI
+  /// @notice Calculates the price of the token in DAI
   function getPrice() external view returns (uint256) {
     return reserveBalance * 1e18 / (totalSupply() * reserveRatio);
   }
 
-  /// @dev Callback for ERC1363 transfers, mints tokens to the sender.
+  /// @notice Callback for ERC1363 transfers, mints tokens to the sender.
   /// @param operator The address which called `transferAndCall` or `transferFromAndCall` function.
   /// @param from The address which are token transferred from.
   /// @param amount The amount of tokens transferred.
