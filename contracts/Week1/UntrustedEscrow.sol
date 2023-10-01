@@ -13,6 +13,10 @@ contract UntrustedEscrow {
   uint256 public startTimestamp;
   uint256 public constant TIMELOCK = 3 days;
 
+  event Deposit(address indexed from, uint256 amount);
+  event Withdraw(address indexed to, uint256 amount);
+  event Cancel(address indexed to, uint256 amount);
+
   constructor(address _buyer, address _seller, address _token) {
     buyer = _buyer;
     seller = _seller;
@@ -24,6 +28,8 @@ contract UntrustedEscrow {
     startTimestamp = block.timestamp;
 
     IERC20(token).safeTransferFrom(buyer, address(this), amount);
+
+    emit Deposit(buyer, amount);
   }
 
   function withdraw() external {
@@ -31,11 +37,15 @@ contract UntrustedEscrow {
     require(block.timestamp >= startTimestamp + TIMELOCK, "Timelock not expired");
 
     IERC20(token).safeTransfer(seller, IERC20(token).balanceOf(address(this)));
+
+    emit Withdraw(seller, IERC20(token).balanceOf(address(this)));
   }
 
   function cancel() external {
     require(msg.sender == buyer, "Only buyer can call this method");
 
     IERC20(token).safeTransfer(buyer, IERC20(token).balanceOf(address(this)));
+
+    emit Cancel(buyer, IERC20(token).balanceOf(address(this)));
   }
 }
