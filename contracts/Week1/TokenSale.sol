@@ -12,6 +12,8 @@ contract TokenSale is BancorFormula, ERC20 {
   uint256 public reserveRatio;
   address public daiERC1363;
 
+  mapping(address => uint256) public mintTimestamp;
+
   event Mint(address indexed to, uint256 amount);
   event Burn(address indexed from, uint256 amount);
 
@@ -29,6 +31,8 @@ contract TokenSale is BancorFormula, ERC20 {
     bool success = IERC1363(daiERC1363).transferFrom(msg.sender, address(this), amount);
     require(success, "Transfer failed");
 
+    mintTimestamp[msg.sender] = block.timestamp;
+
     _continuousMint(msg.sender, amount);
   }
 
@@ -37,6 +41,7 @@ contract TokenSale is BancorFormula, ERC20 {
   function burn(uint256 amount) external {
     require(amount > 0, "Amount must be greater than 0");
     require(balanceOf(msg.sender) >= amount, "Not enough tokens to burn");
+    require(block.timestamp >= mintTimestamp[msg.sender] + 1 days, "Must wait 1 day before burning");
 
     _continuousBurn(msg.sender, amount);
   }

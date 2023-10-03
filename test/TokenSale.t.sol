@@ -53,9 +53,11 @@ contract TokenSaleTest is Test {
     uint256 t2 = tokenSale.calculateMintAmount(depositAmt);
     tokenSale.mint(depositAmt);
 
+    // For the same deposited amt, price is increasing so minted amount should decrease
     assert(t0 > t1);
     assert(t1 > t2);
 
+    // Rate of change should be the same?
     assert(t0 - t1 > t1 - t2);
   }
 
@@ -93,6 +95,8 @@ contract TokenSaleTest is Test {
     uint256 withdrawAmtBuyer1 = tokenSale.balanceOf(buyer1);
     tokenSale.burn(withdrawAmtBuyer1);
 
+    // Buyer1 balance should be greater than initial balance
+    // due to profit made from price increase due to Buyer2 deposit
     assertGt(token.balanceOf(buyer1), buyer1InitBalance);
   }
 

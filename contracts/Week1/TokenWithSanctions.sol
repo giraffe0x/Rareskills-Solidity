@@ -7,8 +7,9 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
  * @dev Implementation of a ERC20 token with a blacklist allowing the owner to sanction accounts.
  */
 contract TokenWithSanction is ERC20, Ownable {
-  // Mapping of blacklisted accounts
   mapping (address => bool) public blacklist;
+
+  event Blacklisted(address indexed account);
 
   constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {}
 
@@ -76,7 +77,7 @@ contract TokenWithSanction is ERC20, Ownable {
   */
   function transferFrom(address sender, address recipient, uint256 amount) public override returns (bool) {
     require(!blacklist[sender], "Caller is blacklisted");
-    require(!blacklist[recipient], "Caller is blacklisted");
+    require(!blacklist[recipient], "Recipient is blacklisted");
     return super.transferFrom(sender, recipient, amount);
   }
 
@@ -89,5 +90,7 @@ contract TokenWithSanction is ERC20, Ownable {
   */
   function addToBlacklist(address account) external onlyOwner {
     blacklist[account] = true;
+
+    emit Blacklisted(account);
   }
 }
