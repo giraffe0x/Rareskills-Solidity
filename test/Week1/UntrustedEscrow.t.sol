@@ -3,8 +3,8 @@ pragma solidity 0.8.21;
 
 import { Test } from "forge-std/Test.sol";
 
-import { UntrustedEscrow } from "../contracts/Week1/UntrustedEscrow.sol";
-import { MockERC20 } from "../contracts/mocks/MockERC20.sol";
+import { UntrustedEscrow } from "../../contracts/Week1/UntrustedEscrow.sol";
+import { MockERC20 } from "../../contracts/mocks/MockERC20.sol";
 
 contract UntrustedEscrowTest is Test {
     address public buyer;

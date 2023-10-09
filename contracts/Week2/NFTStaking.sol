@@ -37,18 +37,21 @@ contract NFTStaking {
     uint256 reward;
 
     while (lastClaimed < block.timestamp) {
-      // e.g. if lastClaimed was 36hrs(day 1.5), then next day is (36 + 24)/24 = 48hrs(day 2)
-      uint256 nextDay = (lastClaimed + DAY) / DAY * DAY;
+      // cannot realistically overflow
+      unchecked {
+        // e.g. if lastClaimed was 36hrs(day 1.5), then next day is (36 + 24)/24 = 48hrs(day 2)
+        uint256 nextDay = (lastClaimed + DAY) / DAY * DAY;
 
-      // e.g. if block.timestamp is 60hrs (day 2.5)
-      // loop 1: accrued time = 48 - 36 = 12hrs
-      // loop 2: accrued time = 60 - 48 = 12hrs
-      uint256 accruedTime = nextDay < block.timestamp
-        ? nextDay - lastClaimed
-        : block.timestamp - lastClaimed;
+        // e.g. if block.timestamp is 60hrs (day 2.5)
+        // loop 1: accrued time = 48 - 36 = 12hrs
+        // loop 2: accrued time = 60 - 48 = 12hrs
+        uint256 accruedTime = nextDay < block.timestamp
+          ? nextDay - lastClaimed
+          : block.timestamp - lastClaimed;
 
-      reward += accruedTime * CLAIM_AMOUNT_PER_DAY / DAY;
-      lastClaimed += accruedTime;
+        reward += accruedTime * CLAIM_AMOUNT_PER_DAY / DAY;
+        lastClaimed += accruedTime;
+      }
     }
 
     // update last claimed timestamp

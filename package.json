@@ -7,8 +7,8 @@
     "url": "https://github.com/chewonithard"
   },
   "devDependencies": {
-    "prettier": "^3.0.0",
-    "@openzeppelin/contracts": "^4.9.3"
+    "@openzeppelin/contracts": "^4.9.3",
+    "prettier": "^3.0.0"
   },
   "keywords": [
     "blockchain",
@@ -32,6 +32,8 @@
     "test:coverage:report": "forge coverage --report lcov && genhtml lcov.info --branch-coverage --output-dir coverage"
   },
   "dependencies": {
+    "@openzeppelin/merkle-tree": "^1.0.5",
     "solhint": "^3.6.2"
-  }
+  },
+  "type": "module"
 }

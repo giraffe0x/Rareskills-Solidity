@@ -2,8 +2,8 @@
 pragma solidity 0.8.21;
 
 import { Test, console2 } from "forge-std/Test.sol";
-import { TokenSale } from "../contracts/Week1/TokenSale.sol";
-import { MockERC1363 } from "../contracts/mocks/MockERC1363.sol";
+import { TokenSale } from "../../contracts/Week1/TokenSale.sol";
+import { MockERC1363 } from "../../contracts/mocks/MockERC1363.sol";
 
 contract TokenSaleTest is Test {
   address public buyer1;

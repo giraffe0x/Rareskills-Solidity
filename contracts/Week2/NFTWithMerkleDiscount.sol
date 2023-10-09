@@ -7,6 +7,7 @@ import { ERC721Royalty } from "@openzeppelin/contracts/token/ERC721/extensions/E
 import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import { BitMaps } from "@openzeppelin/contracts/utils/structs/BitMaps.sol";
 
+import { console } from "forge-std/console.sol";
 
 contract NFTWithMerkleDiscount is ERC721Royalty, Ownable2Step {
   BitMaps.BitMap private claimedBitMap;
@@ -25,9 +26,7 @@ contract NFTWithMerkleDiscount is ERC721Royalty, Ownable2Step {
     merkleRoot = _merkleRoot;
 
     _mint(msg.sender, 0);
-    _mint(msg.sender, 1);
-    _mint(msg.sender, 2);
-    tokensMinted = 3;
+    tokensMinted = 1;
   }
 
   function publicMint() external payable {
@@ -44,7 +43,7 @@ contract NFTWithMerkleDiscount is ERC721Royalty, Ownable2Step {
     require(!BitMaps.get(claimedBitMap, index), "Already claimed");
 
     // verify merkle proof
-    require(_verify(merkleProof), "Invalid merkle proof");
+    require(_verify(merkleProof, index), "Invalid merkle proof");
 
     // update claimed bitmap
     BitMaps.setTo(claimedBitMap, index, true);
@@ -58,8 +57,8 @@ contract NFTWithMerkleDiscount is ERC721Royalty, Ownable2Step {
     _mint(msg.sender, _tokenId);
   }
 
-  function _verify(bytes32[] calldata merkleProof) internal view returns (bool) {
-    bytes32 node = keccak256(abi.encodePacked(msg.sender));
+  function _verify(bytes32[] calldata merkleProof, uint256 index) internal view returns (bool) {
+    bytes32 node = keccak256(bytes.concat(keccak256(abi.encode(msg.sender, index))));
     return MerkleProof.verify(merkleProof, merkleRoot, node);
   }
 
