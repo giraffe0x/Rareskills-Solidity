@@ -34,8 +34,11 @@ contract NFTWithMerkleDiscount is ERC721Royalty, Ownable2Step {
     require(_tokenId < MAX_SUPPLY, "Max supply reached");
     require(msg.value >= PUBLIC_SALEPRICE, "Insufficient ether sent");
 
-    tokensMinted++; // todo check if ++ is better
     _mint(msg.sender, _tokenId);
+
+    unchecked {
+      tokensMinted++;
+    }
   }
 
   function whitelistMint(bytes32[] calldata merkleProof, uint256 index) external payable {
@@ -53,8 +56,11 @@ contract NFTWithMerkleDiscount is ERC721Royalty, Ownable2Step {
     require(_tokenId < MAX_SUPPLY, "Max supply reached");
     require(msg.value >= WHITELIST_SALEPRICE, "Insufficient ether sent");
 
-    tokensMinted++; // todo check if ++ is better
     _mint(msg.sender, _tokenId);
+
+    unchecked {
+      tokensMinted++;
+    }
   }
 
   function _verify(bytes32[] calldata merkleProof, uint256 index) internal view returns (bool) {

@@ -103,15 +103,13 @@ contract TokenSale is BancorFormula, ERC20 {
   }
 
   /// @notice Callback for ERC1363 transfers, mints tokens to the sender.
-  /// @param operator The address which called `transferAndCall` or `transferFromAndCall` function.
   /// @param from The address which are token transferred from.
   /// @param amount The amount of tokens transferred.
-  /// @param data Additional data with no specified format.
   function onTransferReceived(
-    address operator,
+    address /* operator */,
     address from,
     uint256 amount,
-    bytes calldata data
+    bytes calldata /*  data */
   ) external returns (bytes4) {
     require(msg.sender == daiERC1363, "Only DAI accepted");
     _continuousMint(from, amount);
