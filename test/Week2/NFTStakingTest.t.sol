@@ -102,7 +102,16 @@ contract NFTSTakingTest is Test {
   }
 
   function test_withdrawStake() external {
-    // TODO
+    _whitelistMint();
+    erc721Token.approve(address(nftStaker), 1);
+    nftStaker.stake(1);
+
+    // claim after 1.5 days
+    skip(1.5 days);
+
+    nftStaker.claim();
+    assertEq(erc20Token.balanceOf(buyer2), 15);
+    assertEq(erc721Token.ownerOf(1), address(buyer2));
   }
 
   // function test_fuzzClaim(uint256 _days) external {

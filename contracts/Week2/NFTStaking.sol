@@ -33,7 +33,9 @@ contract NFTStaking {
     uint256 _tokenId,
     bytes calldata /*_data*/
   ) external returns(bytes4) {
-    // do not use msg.sender here as it will be this contract
+    // do not use msg.sender here as it will be the ERC721 contract
+    require(msg.sender == address(erc721token), "Not ERC721 token");
+    
     users[_from] = User(block.timestamp, _tokenId);
     emit Stake(_from, _tokenId);
 
