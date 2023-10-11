@@ -18,24 +18,37 @@ contract NFTStaking {
 
   mapping(address user => User userStruct) public users;
 
+  event Stake(address indexed user, uint256 indexed tokenId);
+  event Claim(address indexed user, uint256 amount);
+  event Withdraw(address indexed user, uint256 indexed tokenId);
+
   constructor(address _erc20token, address _erc721token) {
     erc20token = ERC20Token(_erc20token);
     erc721token = IERC721(_erc721token);
   }
 
-  function stake(uint256 tokenId) external {
-    erc721token.safeTransferFrom(msg.sender, address(this), tokenId);
-    users[msg.sender] = User(block.timestamp, tokenId);
+  function onERC721Received(
+    address /*_operator*/,
+    address _from,
+    uint256 _tokenId,
+    bytes calldata /*_data*/
+  ) external returns(bytes4) {
+    // do not use msg.sender here as it will be this contract
+    users[_from] = User(block.timestamp, _tokenId);
+    emit Stake(_from, _tokenId);
+
+    return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
   }
 
-  function claim() external {
-    // require that user has staked
+  function stake(uint256 tokenId) external {
+    erc721token.safeTransferFrom(msg.sender, address(this), tokenId);
+  }
+
+  function claim() public {
     uint256 lastClaimed = users[msg.sender].lastClaimedTimestamp;
     require(lastClaimed != 0, "Not staked");
 
-    // calculate time since last claim and accumulate rewards daily
     uint256 reward;
-
     while (lastClaimed < block.timestamp) {
       // cannot realistically overflow
       unchecked {
@@ -54,38 +67,30 @@ contract NFTStaking {
       }
     }
 
-    // update last claimed timestamp
     users[msg.sender].lastClaimedTimestamp = block.timestamp;
 
-    // mint reward
     erc20token.mint(msg.sender, reward);
+
+    emit Claim(msg.sender, reward);
   }
 
   function withdraw() external {
     User storage user = users[msg.sender];
-    // require that user has staked
     require(user.lastClaimedTimestamp != 0, "Not staked");
 
     // reset user data
     delete users[msg.sender];
 
+    // transfer accrued reward to user
+    claim();
+
     // transfer NFT back to user
-    erc721token.safeTransferFrom(
+    erc721token.transferFrom(
       address(this),
       msg.sender,
       user.stakedTokenId
     );
+
+    emit Withdraw(msg.sender, user.stakedTokenId);
   }
-
-  function onERC721Received(
-    address /*_operator*/,
-    address /*_from*/,
-    uint256 /*_tokenId*/,
-    bytes calldata /*_data*/
-  ) external pure returns(bytes4) {
-    return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
-  }
-
-
-  // TODO accept direct transfer
 }

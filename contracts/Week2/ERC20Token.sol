@@ -9,6 +9,8 @@ contract ERC20Token is ERC20, Ownable2Step {
 
   mapping(address => uint256) public approvedMinters;
 
+  event ApproveMinter(address indexed minter);
+
   function mint(address _to, uint256 _amount) external {
     require(approvedMinters[msg.sender] == 1, "Not approved minter");
     _mint(_to, _amount);
@@ -16,5 +18,7 @@ contract ERC20Token is ERC20, Ownable2Step {
 
   function approveMinter(address _minter) external onlyOwner {
     approvedMinters[_minter] = 1;
+
+    emit ApproveMinter(_minter);
   }
 }

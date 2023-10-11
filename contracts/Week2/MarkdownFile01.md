@@ -6,6 +6,5 @@ Ans: ERC721A makes efficiency gains by not setting explicit owners of specific t
 Ans: `transferFrom` and `safeTransferFrom` cost more gas as the contract has to loop across all tokenId until it reaches the NFT with an explicit owner address
 
 
-
-
 -Why shouldn’t ERC721A enumerable’s implementation be used on-chain?
+Enumeration functions are very gas intense. Unless the dapp really needs this functionality on chain, it is likely better to enumerate offchain instead.

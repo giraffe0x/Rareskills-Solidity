@@ -30,6 +30,4 @@ contract NFTEnumerableCollection is ERC721Enumerable {
     _mint(address(0x6), 19);
     _mint(address(0x6), 20);
   }
-
-
 }
