@@ -3,15 +3,17 @@ pragma solidity 0.8.21;
 
 import { ERC20 } from "lib/solady/src/tokens/ERC20.sol";
 import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { UniswapV2Library } from "./libraries/UniswapV2Library.sol";
 
 // import "./interfaces/IUniswapV2Pair.sol";
 // import "./UniswapV2ERC20.sol";
 // import "./libraries/FixedPointMathLib.sol";
 // import "./libraries/UQ112x112.sol";
 // import "./interfaces/IERC20.sol";
+
+import { IERC20 } from "./interfaces/IERC20.sol";
 import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
-// import "./interfaces/IUniswapV2Callee.sol";
+import { IUniswapV2Callee } from  "./interfaces/IUniswapV2Callee.sol";
 
 // import { console } from "forge-std/console.sol";
 
@@ -33,12 +35,28 @@ contract UniswapV2Pair is ERC20 {
     uint public price1CumulativeLast;
     uint public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
 
-    uint private unlocked = 1;
+    string internal _name = "Pair";
+    string internal _symbol = "Pair";
+
+    uint private unlocked = 2;
     modifier lock() {
-        require(unlocked == 1, "UniswapV2: LOCKED");
-        unlocked = 0;
-        _;
+        require(unlocked == 2, "LOCKED");
         unlocked = 1;
+        _;
+        unlocked = 2;
+    }
+
+    modifier ensure(uint deadline) {
+        require(deadline >= block.timestamp, "EXPIRED");
+        _;
+    }
+
+    function name() public view override returns (string memory) {
+        return _name;
+    }
+
+    function symbol() public view override returns (string memory) {
+        return _symbol;
     }
 
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
@@ -46,10 +64,10 @@ contract UniswapV2Pair is ERC20 {
         _reserve1 = reserve1;
         _blockTimestampLast = blockTimestampLast;
     }
-
+    // TODO implment safeTransfer library?
     function _safeTransfer(address token, address to, uint value) private {
         (bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR, to, value));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "UniswapV2: TRANSFER_FAILED");
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FAILED");
     }
 
     event Mint(address indexed sender, uint amount0, uint amount1);
@@ -64,13 +82,13 @@ contract UniswapV2Pair is ERC20 {
     );
     event Sync(uint112 reserve0, uint112 reserve1);
 
-    constructor() ERC20() {
+    constructor() {
         factory = msg.sender;
     }
 
     // called once by the factory at time of deployment
     function initialize(address _token0, address _token1) external {
-        require(msg.sender == factory, "UniswapV2: FORBIDDEN"); // sufficient check
+        require(msg.sender == factory, "FORBIDDEN"); // sufficient check
         token0 = _token0;
         token1 = _token1;
     }
@@ -100,7 +118,7 @@ contract UniswapV2Pair is ERC20 {
                 uint rootK = FixedPointMathLib.sqrt(uint(_reserve0) * (_reserve1));
                 uint rootKLast = FixedPointMathLib.sqrt(_kLast);
                 if (rootK > rootKLast) {
-                    uint numerator = totalSupply * (rootK - (rootKLast));
+                    uint numerator = totalSupply() * (rootK - (rootKLast));
                     uint denominator = rootK * (5) + (rootKLast);
                     uint liquidity = numerator / denominator;
                     if (liquidity > 0) _mint(feeTo, liquidity);
@@ -111,20 +129,42 @@ contract UniswapV2Pair is ERC20 {
         }
     }
 
-    function superMint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
+    // function superMint(address to, uint256 amount) external {
+    //     _mint(to, amount);
+    // }
 
-    function superBurn(address from, uint256 amount) external {
-        _burn(from, amount);
-    }
+    // function superBurn(address from, uint256 amount) external {
+    //     _burn(from, amount);
+    // }
 
-    function superTransfer(address token, address to, uint256 amount) external {
-        _safeTransfer(token, to, amount);
-    }
-
+    // function superTransfer(address token, address to, uint256 amount) external {
+    //     _safeTransfer(token, to, amount);
+    // }
     // this low-level function should be called from a contract which performs important safety checks
-    function mint(address to) external lock returns (uint liquidity) {
+
+    // TODO handle native
+    function mint(
+      address tokenA,
+      address tokenB,
+      uint amountADesired,
+      uint amountBDesired,
+      uint amountAMin,
+      uint amountBMin,
+      address to,
+      uint deadline) external ensure(deadline) lock returns (uint liquidity) {
+
+        (uint amountA, uint amountB) = _addLiquidity(
+          tokenA,
+          tokenB,
+          amountADesired,
+          amountBDesired,
+          amountAMin,
+          amountBMin
+        );
+
+        _safeTransfer(tokenA, address(this), amountA);
+        _safeTransfer(tokenB, address(this), amountB);
+
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
         uint balance0 = IERC20(token0).balanceOf(address(this));
         uint balance1 = IERC20(token1).balanceOf(address(this));
@@ -132,14 +172,19 @@ contract UniswapV2Pair is ERC20 {
         uint amount1 = balance1 - (_reserve1);
 
         bool feeOn = _mintFee(_reserve0, _reserve1);
-        uint _totalSupply = totalSupply; // gas savings, must be defined here since totalSupply can update in _mintFee
+        uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
         if (_totalSupply == 0) {
             liquidity = FixedPointMathLib.sqrt(amount0 * (amount1)) - (MINIMUM_LIQUIDITY);
            _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
         } else {
-            liquidity = FixedPointMathLib.min(amount0 * (_totalSupply) / _reserve0, amount1 * (_totalSupply) / _reserve1);
+            liquidity = FixedPointMathLib.min(
+              amount0
+              * (_totalSupply)
+              / _reserve0, amount1
+              * (_totalSupply)
+              / _reserve1);
         }
-        require(liquidity > 0, "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED");
+        require(liquidity > 0, "INSUFFICIENT_LIQUIDITY_MINTED");
         _mint(to, liquidity);
 
         _update(balance0, balance1, _reserve0, _reserve1);
@@ -154,13 +199,15 @@ contract UniswapV2Pair is ERC20 {
         address _token1 = token1;                                // gas savings
         uint balance0 = IERC20(_token0).balanceOf(address(this));
         uint balance1 = IERC20(_token1).balanceOf(address(this));
-        uint liquidity = balanceOf[address(this)];
+        // uint liquidity = balanceOf[address(this)];
+        // TODO check if can be optimized
+        uint liquidity = IERC20(address(this)).balanceOf(address(this));
 
         bool feeOn = _mintFee(_reserve0, _reserve1);
-        uint _totalSupply = totalSupply; // gas savings, must be defined here since totalSupply can update in _mintFee
+        uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
         amount0 = liquidity * (balance0) / _totalSupply; // using balances ensures pro-rata distribution
         amount1 = liquidity * (balance1) / _totalSupply; // using balances ensures pro-rata distribution
-        require(amount0 > 0 && amount1 > 0, "UniswapV2: INSUFFICIENT_LIQUIDITY_BURNED");
+        require(amount0 > 0 && amount1 > 0, "INSUFFICIENT_LIQUIDITY_BURNED");
         _burn(address(this), liquidity);
         _safeTransfer(_token0, to, amount0);
         _safeTransfer(_token1, to, amount1);
@@ -174,16 +221,16 @@ contract UniswapV2Pair is ERC20 {
 
     // this low-level function should be called from a contract which performs important safety checks
     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {
-        require(amount0Out > 0 || amount1Out > 0, "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT");
+        require(amount0Out > 0 || amount1Out > 0, "INSUFFICIENT_OUTPUT_AMOUNT");
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
-        require(amount0Out < _reserve0 && amount1Out < _reserve1, "UniswapV2: INSUFFICIENT_LIQUIDITY");
+        require(amount0Out < _reserve0 && amount1Out < _reserve1, "INSUFFICIENT_LIQUIDITY");
 
         uint balance0;
         uint balance1;
         { // scope for _token{0,1}, avoids stack too deep errors
         address _token0 = token0;
         address _token1 = token1;
-        require(to != _token0 && to != _token1, "UniswapV2: INVALID_TO");
+        require(to != _token0 && to != _token1, "INVALID_TO");
         if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
         if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
         if (data.length > 0) IUniswapV2Callee(to).uniswapV2Call(msg.sender, amount0Out, amount1Out, data);
@@ -192,11 +239,11 @@ contract UniswapV2Pair is ERC20 {
         }
         uint amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
         uint amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
-        require(amount0In > 0 || amount1In > 0, "UniswapV2: INSUFFICIENT_INPUT_AMOUNT");
+        require(amount0In > 0 || amount1In > 0, "INSUFFICIENT_INPUT_AMOUNT");
         { // scope for reserve{0,1}Adjusted, avoids stack too deep errors
         uint balance0Adjusted = balance0 * (1000) - (amount0In * (3));
         uint balance1Adjusted = balance1 * (1000) - (amount1In * (3));
-        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (1000**2), "UniswapV2: K");
+        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (1000**2), "K");
         }
 
         _update(balance0, balance1, _reserve0, _reserve1);
@@ -214,5 +261,34 @@ contract UniswapV2Pair is ERC20 {
     // force reserves to match balances
     function sync() external lock {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
+    }
+
+    function _addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint amountADesired,
+        uint amountBDesired,
+        uint amountAMin,
+        uint amountBMin
+    ) internal virtual returns (uint amountA, uint amountB) {
+        // create the pair if it doesn't exist yet
+        if (IUniswapV2Factory(factory).getPair(tokenA, tokenB) == address(0)) {
+            IUniswapV2Factory(factory).createPair(tokenA, tokenB);
+        }
+        (uint reserveA, uint reserveB) = UniswapV2Library.getReserves(factory, tokenA, tokenB);
+        if (reserveA == 0 && reserveB == 0) {
+            (amountA, amountB) = (amountADesired, amountBDesired);
+        } else {
+            uint amountBOptimal = UniswapV2Library.quote(amountADesired, reserveA, reserveB);
+            if (amountBOptimal <= amountBDesired) {
+                require(amountBOptimal >= amountBMin, "UniswapV2Router: INSUFFICIENT_B_AMOUNT");
+                (amountA, amountB) = (amountADesired, amountBOptimal);
+            } else {
+                uint amountAOptimal = UniswapV2Library.quote(amountBDesired, reserveB, reserveA);
+                assert(amountAOptimal <= amountADesired);
+                require(amountAOptimal >= amountAMin, "UniswapV2Router: INSUFFICIENT_A_AMOUNT");
+                (amountA, amountB) = (amountAOptimal, amountBDesired);
+            }
+        }
     }
 }
