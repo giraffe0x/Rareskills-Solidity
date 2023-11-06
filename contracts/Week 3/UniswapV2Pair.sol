@@ -4,13 +4,14 @@ pragma solidity 0.8.21;
 import { ERC20 } from "lib/solady/src/tokens/ERC20.sol";
 import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
 import { UniswapV2Library } from "./libraries/UniswapV2Library.sol";
+import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
 
 // import "./interfaces/IUniswapV2Pair.sol";
 // import "./UniswapV2ERC20.sol";
 // import "./libraries/FixedPointMathLib.sol";
 // import "./libraries/UQ112x112.sol";
 // import "./interfaces/IERC20.sol";
-
+import { IWETH } from "./interfaces/IWETH.sol";
 import { IERC20 } from "./interfaces/IERC20.sol";
 import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 import { IUniswapV2Callee } from  "./interfaces/IUniswapV2Callee.sol";
@@ -19,11 +20,13 @@ import { IUniswapV2Callee } from  "./interfaces/IUniswapV2Callee.sol";
 
 contract UniswapV2Pair is ERC20 {
     // using UQ112x112 for uint224;
+    using SafeTransferLib for IERC20;
 
     uint public constant MINIMUM_LIQUIDITY = 10**3;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes("transfer(address,uint256)")));
 
-    address public factory;
+    address public immutable factory;
+    address public immutable WETH;
     address public token0;
     address public token1;
 
@@ -64,11 +67,6 @@ contract UniswapV2Pair is ERC20 {
         _reserve1 = reserve1;
         _blockTimestampLast = blockTimestampLast;
     }
-    // TODO implment safeTransfer library?
-    function _safeTransfer(address token, address to, uint value) private {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR, to, value));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TRANSFER_FAILED");
-    }
 
     event Mint(address indexed sender, uint amount0, uint amount1);
     event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
@@ -82,8 +80,9 @@ contract UniswapV2Pair is ERC20 {
     );
     event Sync(uint112 reserve0, uint112 reserve1);
 
-    constructor() {
+    constructor(address _weth) {
         factory = msg.sender;
+        WETH = _weth;
     }
 
     // called once by the factory at time of deployment
@@ -129,19 +128,6 @@ contract UniswapV2Pair is ERC20 {
         }
     }
 
-    // function superMint(address to, uint256 amount) external {
-    //     _mint(to, amount);
-    // }
-
-    // function superBurn(address from, uint256 amount) external {
-    //     _burn(from, amount);
-    // }
-
-    // function superTransfer(address token, address to, uint256 amount) external {
-    //     _safeTransfer(token, to, amount);
-    // }
-    // this low-level function should be called from a contract which performs important safety checks
-
     // TODO handle native
     function mint(
       address tokenA,
@@ -151,9 +137,9 @@ contract UniswapV2Pair is ERC20 {
       uint amountAMin,
       uint amountBMin,
       address to,
-      uint deadline) external ensure(deadline) lock returns (uint liquidity) {
+      uint deadline) external ensure(deadline) lock returns (uint amountA, uint amountB, uint liquidity) {
 
-        (uint amountA, uint amountB) = _addLiquidity(
+        (amountA, amountB) = _addLiquidity(
           tokenA,
           tokenB,
           amountADesired,
@@ -162,8 +148,8 @@ contract UniswapV2Pair is ERC20 {
           amountBMin
         );
 
-        _safeTransfer(tokenA, address(this), amountA);
-        _safeTransfer(tokenB, address(this), amountB);
+        SafeTransferLib.safeTransferFrom(tokenA, msg.sender, address(this), amountA);
+        SafeTransferLib.safeTransferFrom(tokenB, msg.sender, address(this), amountB);
 
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
         uint balance0 = IERC20(token0).balanceOf(address(this));
@@ -192,34 +178,86 @@ contract UniswapV2Pair is ERC20 {
         emit Mint(msg.sender, amount0, amount1);
     }
 
-    // this low-level function should be called from a contract which performs important safety checks
-    function burn(address to) external lock returns (uint amount0, uint amount1) {
-        (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
-        address _token0 = token0;                                // gas savings
-        address _token1 = token1;                                // gas savings
+    function burn(
+      address tokenA,
+      address tokenB,
+      uint liquidity,
+      uint amountAMin,
+      uint amountBMin,
+      address to,
+      uint deadline
+    ) public lock ensure(deadline) returns (uint amount0, uint amount1) {
+        require(balanceOf(msg.sender) >= liquidity, "INSUFFICIENT_LIQUIDITY");
+
+        // handle protocol fees
+        (uint112 _reserve0, uint112 _reserve1,) = getReserves();
+        address _token0 = token0;
+        address _token1 = token1;
         uint balance0 = IERC20(_token0).balanceOf(address(this));
         uint balance1 = IERC20(_token1).balanceOf(address(this));
-        // uint liquidity = balanceOf[address(this)];
-        // TODO check if can be optimized
-        uint liquidity = IERC20(address(this)).balanceOf(address(this));
-
         bool feeOn = _mintFee(_reserve0, _reserve1);
-        uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
-        amount0 = liquidity * (balance0) / _totalSupply; // using balances ensures pro-rata distribution
-        amount1 = liquidity * (balance1) / _totalSupply; // using balances ensures pro-rata distribution
+
+        // gas savings, must be defined here since totalSupply can update in _mintFee
+        uint _totalSupply = totalSupply();
+
+        // using balances ensures pro-rata distribution
+        amount0 = liquidity * (balance0) / _totalSupply;
+        amount1 = liquidity * (balance1) / _totalSupply;
         require(amount0 > 0 && amount1 > 0, "INSUFFICIENT_LIQUIDITY_BURNED");
-        _burn(address(this), liquidity);
-        _safeTransfer(_token0, to, amount0);
-        _safeTransfer(_token1, to, amount1);
+
+        // burn pair tokens from msg.sender
+        _burn(msg.sender, liquidity);
+        // transfer out underlying tokens
+        SafeTransferLib.safeTransfer(_token0, to, amount0);
+        SafeTransferLib.safeTransfer(_token1, to, amount1);
+
         balance0 = IERC20(_token0).balanceOf(address(this));
         balance1 = IERC20(_token1).balanceOf(address(this));
 
         _update(balance0, balance1, _reserve0, _reserve1);
         if (feeOn) kLast = uint(reserve0) * (reserve1); // reserve0 and reserve1 are up-to-date
+
+        // sort tokens
+        (address _tokenA,) = _sortTokens(_token0, _token1);
+        (uint amountA, uint amountB) = tokenA == _tokenA ? (amount0, amount1) : (amount1, amount0);
+
+        // check for slippage
+        require(amountA >= amountAMin, "INSUFFICIENT_A_AMOUNT");
+        require(amountB >= amountBMin, "INSUFFICIENT_B_AMOUNT");
+
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    // this low-level function should be called from a contract which performs important safety checks
+    function burnETH(
+        address token,
+        uint liquidity,
+        uint amountTokenMin,
+        uint amountETHMin,
+        address to,
+        uint deadline
+    ) external ensure(deadline) lock returns (uint amountToken, uint amountETH) {
+      // transfer in pair token
+      SafeTransferLib.safeTransferFrom(address(this), msg.sender, address(this), liquidity);
+
+      burn(
+        token,
+        WETH,
+        liquidity,
+        amountTokenMin,
+        amountETHMin,
+        address(this),
+        deadline
+      );
+
+      IERC20(token).safeTransfer(to, amountToken);
+      IWETH(WETH).withdraw(amountETH);
+      (bool success,) = to.call{value: amountETH}("");
+      require(success, "ETH_TRANSFER_FAILED");
+    }
+
+    // TODO burn with permit
+
+
     function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {
         require(amount0Out > 0 || amount1Out > 0, "INSUFFICIENT_OUTPUT_AMOUNT");
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
@@ -290,5 +328,11 @@ contract UniswapV2Pair is ERC20 {
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
             }
         }
+    }
+
+  function _sortTokens(address tokenA, address tokenB) internal pure returns (address _token0, address _token1) {
+        require(tokenA != tokenB, "UniswapV2Library: IDENTICAL_ADDRESSES");
+        (_token0, _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        require(_token0 != address(0), "UniswapV2Library: ZERO_ADDRESS");
     }
 }
