@@ -2,6 +2,7 @@
 pragma solidity 0.8.21;
 
 import { IUniswapV2Pair } from "../interfaces/IUniswapV2Pair.sol";
+import { IUniswapV2Factory } from "../interfaces/IUniswapV2Factory.sol";
 
 // import { console } from "forge-std/console.sol";
 
@@ -13,16 +14,18 @@ library UniswapV2Library {
         require(token0 != address(0), "ZERO_ADDRESS");
     }
 
-    // calculates the CREATE2 address for a pair without making any external calls
-    function pairFor(address factory, address tokenA, address tokenB) internal pure returns (address pair) {
-        (address token0, address token1) = sortTokens(tokenA, tokenB);
-        pair = address(uint160(uint256(keccak256(abi.encodePacked(
-                hex"ff",
-                factory,
-                keccak256(abi.encodePacked(token0, token1)),
-                hex"7b76bafd1f26a6e71256a97c8e3b2f3dcaa9eea5f0bbf4eb97b43c94f398bd05" // init code hash
-            )))));
-    }
+    // // calculates the CREATE2 address for a pair without making any external calls
+    // function pairFor(address factory, address tokenA, address tokenB) internal view returns (address pair) {
+    //     (address token0, address token1) = sortTokens(tokenA, tokenB);
+    //     pair = address(uint160(uint256(keccak256(abi.encodePacked(
+    //             hex"ff",
+    //             factory,
+    //             keccak256(abi.encodePacked(token0, token1)),
+    //             hex"4631b8625fa60c0bfdc32a60e5d88639987ad113b590513fd8b8055541d7d5ab" // init code hash
+    //         )))));
+    //     console.log("THE factory", factory);
+    //     console.log("THE pair", pair);
+    // }
 
     // fetches and sorts the reserves for a pair
     function getReserves(
@@ -31,7 +34,7 @@ library UniswapV2Library {
       address tokenB
     ) internal view returns (uint reserveA, uint reserveB) {
         (address token0,) = sortTokens(tokenA, tokenB);
-        (uint reserve0, uint reserve1,) = IUniswapV2Pair(pairFor(factory, tokenA, tokenB)).getReserves();
+        (uint reserve0, uint reserve1,) = IUniswapV2Pair(IUniswapV2Factory(factory).getPair(tokenA, tokenB)).getReserves();
         (reserveA, reserveB) = tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
     }
 

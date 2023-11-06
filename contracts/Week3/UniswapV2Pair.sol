@@ -14,8 +14,6 @@ import { IERC3156FlashBorrower } from "./interfaces/IERC3156FlashBorrower.sol";
 import { IERC3156FlashLender } from "./interfaces/IERC3156FlashLender.sol";
 // import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
 
-// import { console } from "forge-std/console.sol";
-
 contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
     using SafeTransferLib for IERC20;
 
@@ -81,7 +79,8 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
       uint amountAMin,
       uint amountBMin,
       address to,
-      uint deadline) external ensure(deadline) nonReentrant returns (uint amountA, uint amountB, uint liquidity) {
+      uint deadline
+    ) external ensure(deadline) nonReentrant returns (uint amountA, uint amountB, uint liquidity) {
         // Get correct amount of A/B to transfer in
         (amountA, amountB) = _addLiquidity(
           tokenA,
@@ -129,19 +128,22 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
       address to,
       uint deadline
     ) public nonReentrant ensure(deadline) returns (uint amount0, uint amount1) {
-        require(balanceOf(msg.sender) >= liquidity, "INSUFFICIENT_LIQUIDITY");
-
         // handle protocol fees
         (uint112 _reserve0, uint112 _reserve1,) = getReserves();
         address _token0 = token0;
         address _token1 = token1;
-        uint balance0 = IERC20(_token0).balanceOf(address(this));
-        uint balance1 = IERC20(_token1).balanceOf(address(this));
 
         bool feeOn = _mintFee(_reserve0, _reserve1);
+        {
         uint _totalSupply = totalSupply();
-        amount0 = liquidity * (balance0) / _totalSupply; // using balances ensures pro-rata distribution
-        amount1 = liquidity * (balance1) / _totalSupply; // using balances ensures pro-rata distribution
+
+        amount0 = liquidity
+          * (IERC20(_token0).balanceOf(address(this)))
+          / _totalSupply; // using balances ensures pro-rata distribution
+
+        amount1 = liquidity
+          * (IERC20(_token1).balanceOf(address(this)))
+          / _totalSupply; // using balances ensures pro-rata distribution
         require(amount0 > 0 && amount1 > 0, "INSUFFICIENT_LIQUIDITY_BURNED");
 
         // burn pair tokens from msg.sender
@@ -150,15 +152,18 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
         // check for slippage
         require(amount0 >= amountAMin, "INSUFFICIENT_A_AMOUNT");
         require(amount1 >= amountBMin, "INSUFFICIENT_B_AMOUNT");
-
+        }
         // transfer out underlying tokens
         SafeTransferLib.safeTransfer(_token0, to, amount0);
         SafeTransferLib.safeTransfer(_token1, to, amount1);
 
-        balance0 = IERC20(_token0).balanceOf(address(this));
-        balance1 = IERC20(_token1).balanceOf(address(this));
+        _update(
+          IERC20(_token0).balanceOf(address(this)),
+          IERC20(_token1).balanceOf(address(this)),
+          _reserve0,
+          _reserve1
+        );
 
-        _update(balance0, balance1, _reserve0, _reserve1);
         if (feeOn) kLast = uint(reserve0) * (reserve1); // reserve0 and reserve1 are up-to-date
 
         emit Burn(msg.sender, amount0, amount1, to);
