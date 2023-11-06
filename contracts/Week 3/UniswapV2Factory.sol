@@ -19,10 +19,6 @@ contract UniswapV2Factory {
         feeToSetter = _feeToSetter;
     }
 
-    function allPairsLength() external view returns (uint) {
-        return allPairs.length;
-    }
-
     function createPair(address tokenA, address tokenB) external returns (address pair) {
         (address token0, address token1) = sortTokens(tokenA, tokenB);
         pair = pairFor(token0, token1);
@@ -55,6 +51,10 @@ contract UniswapV2Factory {
                 keccak256(abi.encodePacked(token0, token1)), // salt
                 PAIR_BYTECODE
             )))));
+    }
+
+    function allPairsLength() external view returns (uint) {
+        return allPairs.length;
     }
 
     function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {

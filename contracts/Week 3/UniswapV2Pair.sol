@@ -5,33 +5,34 @@ import { ERC20 } from "lib/solady/src/tokens/ERC20.sol";
 import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
 import { UniswapV2Library } from "./libraries/UniswapV2Library.sol";
 import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
-
+import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import { IWETH } from "./interfaces/IWETH.sol";
 import { IERC20 } from "./interfaces/IERC20.sol";
 import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
-import { IUniswapV2Callee } from  "./interfaces/IUniswapV2Callee.sol";
-import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
+import { IERC3156FlashBorrower } from "./interfaces/IERC3156FlashBorrower.sol";
+import { IERC3156FlashLender } from "./interfaces/IERC3156FlashLender.sol";
+// import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
 
 // import { console } from "forge-std/console.sol";
 
-contract UniswapV2Pair is ERC20 {
+contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
     using SafeTransferLib for IERC20;
 
     uint public constant MINIMUM_LIQUIDITY = 10**3;
     uint private constant SAFE_MULTIPLIER = 1e18;
-    uint private constant SWAP_FEE = 3;
-    // If turned on, fee of 0.05% per trade. This represents ⅙th of the 0.30% fee.
+    uint private constant SWAP_FEE = 30;
     uint private constant PROTOCOL_FEE = 5;
-    uint private constant BASE = 1000;
+    uint private constant BASE = 10000;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes("transfer(address,uint256)")));
+    bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
 
     address public immutable factory;
-    address public immutable WETH;
     address public token0;
     address public token1;
 
     // TODO replace with custom data types
+    // TODO Natspec
     uint112 private reserve0;           // uses single storage slot, accessible via getReserves
     uint112 private reserve1;           // uses single storage slot, accessible via getReserves
     uint32  private blockTimestampLast; // uses single storage slot, accessible via getReserves
@@ -43,31 +44,9 @@ contract UniswapV2Pair is ERC20 {
     string public constant NAME = "Uniswap V2";
     string public constant SYMBOL = "UNI-V2";
 
-    uint private unlocked = 2;
-    modifier lock() {
-        require(unlocked == 2, "LOCKED");
-        unlocked = 1;
-        _;
-        unlocked = 2;
-    }
-
     modifier ensure(uint deadline) {
         require(deadline >= block.timestamp, "EXPIRED");
         _;
-    }
-
-    function name() public pure override returns (string memory) {
-        return NAME;
-    }
-
-    function symbol() public pure override returns (string memory) {
-        return SYMBOL;
-    }
-
-    function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
-        _reserve0 = reserve0;
-        _reserve1 = reserve1;
-        _blockTimestampLast = blockTimestampLast;
     }
 
     event Mint(address indexed sender, uint amount0, uint amount1);
@@ -80,11 +59,11 @@ contract UniswapV2Pair is ERC20 {
         uint amount1Out,
         address indexed to
     );
+    event Flashloan(address indexed receiver, address indexed token, uint256 amount, uint256 fee, bytes data);
     event Sync(uint112 reserve0, uint112 reserve1);
 
-    constructor(address _weth) {
+    constructor() {
         factory = msg.sender;
-        WETH = _weth;
     }
 
     // called once by the factory at time of deployment
@@ -92,45 +71,6 @@ contract UniswapV2Pair is ERC20 {
         require(msg.sender == factory, "FORBIDDEN"); // sufficient check
         token0 = _token0;
         token1 = _token1;
-    }
-
-    // update reserves and, on the first call per block, price accumulators
-    function _update(uint balance0, uint balance1, uint112 _reserve0 , uint112 _reserve1) private {
-        uint32 blockTimestamp = uint32(block.timestamp);
-        unchecked {
-          uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
-
-          if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
-            // * never overflows, and + overflow is desired
-            price0CumulativeLast += (uint256(_reserve1) * SAFE_MULTIPLIER / _reserve0) * timeElapsed;
-            price1CumulativeLast += (uint256(_reserve0) * SAFE_MULTIPLIER / _reserve1) * timeElapsed;
-          }
-        }
-        reserve0 = uint112(balance0);
-        reserve1 = uint112(balance1);
-        blockTimestampLast = blockTimestamp;
-        emit Sync(reserve0, reserve1);
-    }
-
-    // if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
-    function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
-        address feeTo = IUniswapV2Factory(factory).feeTo();
-        feeOn = feeTo != address(0);
-        uint _kLast = kLast; // gas savings
-        if (feeOn) {
-            if (_kLast != 0) {
-                uint rootK = FixedPointMathLib.sqrt(uint(_reserve0) * (_reserve1));
-                uint rootKLast = FixedPointMathLib.sqrt(_kLast);
-                if (rootK > rootKLast) {
-                    uint numerator = totalSupply() * (rootK - (rootKLast));
-                    uint denominator = rootK * (PROTOCOL_FEE) + (rootKLast);
-                    uint liquidity = numerator / denominator;
-                    if (liquidity > 0) _mint(feeTo, liquidity);
-                }
-            }
-        } else if (_kLast != 0) {
-            kLast = 0;
-        }
     }
 
     function mint(
@@ -141,7 +81,7 @@ contract UniswapV2Pair is ERC20 {
       uint amountAMin,
       uint amountBMin,
       address to,
-      uint deadline) external ensure(deadline) lock returns (uint amountA, uint amountB, uint liquidity) {
+      uint deadline) external ensure(deadline) nonReentrant returns (uint amountA, uint amountB, uint liquidity) {
         // Get correct amount of A/B to transfer in
         (amountA, amountB) = _addLiquidity(
           tokenA,
@@ -165,7 +105,7 @@ contract UniswapV2Pair is ERC20 {
         uint _totalSupply = totalSupply(); // gas savings, must be defined here since totalSupply can update in _mintFee
         if (_totalSupply == 0) {
             liquidity = FixedPointMathLib.sqrt(amount0 * (amount1)) - (MINIMUM_LIQUIDITY);
-           _mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
+           _mint(address(0), MINIMUM_LIQUIDITY); // permanently non the first MINIMUM_LIQUIDITY tokens
         } else {
             liquidity = FixedPointMathLib.min(
               amount0
@@ -188,7 +128,7 @@ contract UniswapV2Pair is ERC20 {
       uint amountBMin,
       address to,
       uint deadline
-    ) public lock ensure(deadline) returns (uint amount0, uint amount1) {
+    ) public nonReentrant ensure(deadline) returns (uint amount0, uint amount1) {
         require(balanceOf(msg.sender) >= liquidity, "INSUFFICIENT_LIQUIDITY");
 
         // handle protocol fees
@@ -242,7 +182,7 @@ contract UniswapV2Pair is ERC20 {
       SafeTransferLib.safeTransferFrom(path[0], msg.sender, address(this), amountIn);
 
       (uint amount0Out, uint amount1Out) = path[0] == _token0 ? (uint(0), amountOut) : (amountOut, uint(0));
-      swap(amount0Out, amount1Out, to, new bytes(0));
+      swap(amount0Out, amount1Out, to);
     }
 
     function swapTokensForExactTokens(
@@ -262,15 +202,14 @@ contract UniswapV2Pair is ERC20 {
       SafeTransferLib.safeTransferFrom(path[0], msg.sender, address(this), amountIn);
 
       (uint amount0Out, uint amount1Out) = path[0] == _token0 ? (uint(0), amountOut) : (amountOut, uint(0));
-      swap(amount0Out, amount1Out, to, new bytes(0));
+      swap(amount0Out, amount1Out, to);
     }
 
     function swap(
       uint amount0Out,
       uint amount1Out,
-      address to,
-      bytes memory data
-    ) public lock {
+      address to
+    ) public nonReentrant {
         require(amount0Out > 0 || amount1Out > 0, "INSUFFICIENT_OUTPUT_AMOUNT");
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
         require(amount0Out < _reserve0 && amount1Out < _reserve1, "INSUFFICIENT_LIQUIDITY");
@@ -283,7 +222,7 @@ contract UniswapV2Pair is ERC20 {
         require(to != _token0 && to != _token1, "INVALID_TO");
         if (amount0Out > 0) SafeTransferLib.safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
         if (amount1Out > 0) SafeTransferLib.safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
-        if (data.length > 0) IUniswapV2Callee(to).uniswapV2Call(msg.sender, amount0Out, amount1Out, data);
+
         balance0 = IERC20(_token0).balanceOf(address(this));
         balance1 = IERC20(_token1).balanceOf(address(this));
         }
@@ -300,8 +239,37 @@ contract UniswapV2Pair is ERC20 {
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 
+    function flashLoan(
+      IERC3156FlashBorrower receiver,
+      address token,
+      uint256 amount,
+      bytes calldata data
+    ) external returns (bool) {
+        // require token to match token0 or 1
+        require(token == token0 || token == token1, "INVALID_TOKEN");
+
+        // calculate fee
+        uint256 fee = _flashFee(amount);
+
+        // send tokens optimistically
+        SafeTransferLib.safeTransfer(token, address(receiver), amount);
+
+        // call receiver
+        require(
+          receiver.onFlashLoan(msg.sender, token, amount, fee, data) == CALLBACK_SUCCESS,
+          "CALLBACK_FAILED"
+        );
+
+        // retrieve borrowed amount + fee from receiver
+        SafeTransferLib.safeTransferFrom(token, address(receiver), address(this), amount + fee);
+
+        emit Flashloan(address(receiver), token, amount, fee, data);
+
+        return true;
+    }
+
     // force balances to match reserves
-    function skim(address to) external lock {
+    function skim(address to) external nonReentrant {
         address _token0 = token0; // gas savings
         address _token1 = token1; // gas savings
         SafeTransferLib.safeTransfer(_token0, to, IERC20(_token0).balanceOf(address(this)) - (reserve0));
@@ -309,9 +277,36 @@ contract UniswapV2Pair is ERC20 {
     }
 
     // force reserves to match balances
-    function sync() external lock {
+    function sync() external nonReentrant {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
+
+    function name() public pure override returns (string memory) {
+        return NAME;
+    }
+
+    function symbol() public pure override returns (string memory) {
+        return SYMBOL;
+    }
+
+    function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
+        _reserve0 = reserve0;
+        _reserve1 = reserve1;
+        _blockTimestampLast = blockTimestampLast;
+    }
+
+    /* ================== VIEW FUNCTIONS =================== */
+
+    function flashFee(address token, uint256 amount) external view returns (uint256) {
+        require(token == token0 || token == token1, "INVALID_TOKEN");
+        return _flashFee(amount);
+    }
+
+    function maxFlashLoan(address token) external view returns (uint256) {
+        return token == token0 ? reserve0 - MINIMUM_LIQUIDITY : reserve1 - MINIMUM_LIQUIDITY;
+    }
+
+    /* ================== PRIVATE FUNCTIONS =================== */
 
     function _addLiquidity(
         address tokenA,
@@ -320,7 +315,7 @@ contract UniswapV2Pair is ERC20 {
         uint amountBDesired,
         uint amountAMin,
         uint amountBMin
-    ) internal virtual returns (uint amountA, uint amountB) {
+    ) private returns (uint amountA, uint amountB) {
         // create the pair if it doesn't exist yet
         if (IUniswapV2Factory(factory).getPair(tokenA, tokenB) == address(0)) {
             IUniswapV2Factory(factory).createPair(tokenA, tokenB);
@@ -340,5 +335,48 @@ contract UniswapV2Pair is ERC20 {
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
             }
         }
+    }
+
+    // update reserves and, on the first call per block, price accumulators
+    function _update(uint balance0, uint balance1, uint112 _reserve0 , uint112 _reserve1) private {
+        uint32 blockTimestamp = uint32(block.timestamp);
+        unchecked {
+          uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
+
+          if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
+            // * never overflows, and + overflow is desired
+            price0CumulativeLast += (uint256(_reserve1) * SAFE_MULTIPLIER / _reserve0) * timeElapsed;
+            price1CumulativeLast += (uint256(_reserve0) * SAFE_MULTIPLIER / _reserve1) * timeElapsed;
+          }
+        }
+        reserve0 = uint112(balance0);
+        reserve1 = uint112(balance1);
+        blockTimestampLast = blockTimestamp;
+        emit Sync(reserve0, reserve1);
+    }
+
+    // if fee is on, mint liquidity equivalent to 1/6th of the growth in sqrt(k)
+    function _mintFee(uint112 _reserve0, uint112 _reserve1) private returns (bool feeOn) {
+        address feeTo = IUniswapV2Factory(factory).feeTo();
+        feeOn = feeTo != address(0);
+        uint _kLast = kLast; // gas savings
+        if (feeOn) {
+            if (_kLast != 0) {
+                uint rootK = FixedPointMathLib.sqrt(uint(_reserve0) * (_reserve1));
+                uint rootKLast = FixedPointMathLib.sqrt(_kLast);
+                if (rootK > rootKLast) {
+                    uint numerator = totalSupply() * (rootK - (rootKLast));
+                    uint denominator = rootK * (PROTOCOL_FEE) + (rootKLast);
+                    uint liquidity = numerator / denominator;
+                    if (liquidity > 0) _mint(feeTo, liquidity);
+                }
+            }
+        } else if (_kLast != 0) {
+            kLast = 0;
+        }
+    }
+
+    function _flashFee(uint256 amount) private pure returns (uint256) {
+        return amount * SWAP_FEE / BASE;
     }
 }
