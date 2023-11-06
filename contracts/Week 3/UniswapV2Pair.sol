@@ -6,15 +6,11 @@ import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
 import { UniswapV2Library } from "./libraries/UniswapV2Library.sol";
 import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
 
-// import "./interfaces/IUniswapV2Pair.sol";
-// import "./UniswapV2ERC20.sol";
-// import "./libraries/FixedPointMathLib.sol";
-// import "./libraries/UQ112x112.sol";
-// import "./interfaces/IERC20.sol";
 import { IWETH } from "./interfaces/IWETH.sol";
 import { IERC20 } from "./interfaces/IERC20.sol";
 import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 import { IUniswapV2Callee } from  "./interfaces/IUniswapV2Callee.sol";
+import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
 
 // import { console } from "forge-std/console.sol";
 
@@ -128,7 +124,6 @@ contract UniswapV2Pair is ERC20 {
         }
     }
 
-    // TODO handle native
     function mint(
       address tokenA,
       address tokenB,
@@ -179,8 +174,6 @@ contract UniswapV2Pair is ERC20 {
     }
 
     function burn(
-      address tokenA,
-      address tokenB,
       uint liquidity,
       uint amountAMin,
       uint amountBMin,
@@ -195,18 +188,20 @@ contract UniswapV2Pair is ERC20 {
         address _token1 = token1;
         uint balance0 = IERC20(_token0).balanceOf(address(this));
         uint balance1 = IERC20(_token1).balanceOf(address(this));
+
         bool feeOn = _mintFee(_reserve0, _reserve1);
-
-        // gas savings, must be defined here since totalSupply can update in _mintFee
         uint _totalSupply = totalSupply();
-
-        // using balances ensures pro-rata distribution
-        amount0 = liquidity * (balance0) / _totalSupply;
-        amount1 = liquidity * (balance1) / _totalSupply;
+        amount0 = liquidity * (balance0) / _totalSupply; // using balances ensures pro-rata distribution
+        amount1 = liquidity * (balance1) / _totalSupply; // using balances ensures pro-rata distribution
         require(amount0 > 0 && amount1 > 0, "INSUFFICIENT_LIQUIDITY_BURNED");
 
         // burn pair tokens from msg.sender
         _burn(msg.sender, liquidity);
+
+        // check for slippage
+        require(amount0 >= amountAMin, "INSUFFICIENT_A_AMOUNT");
+        require(amount1 >= amountBMin, "INSUFFICIENT_B_AMOUNT");
+
         // transfer out underlying tokens
         SafeTransferLib.safeTransfer(_token0, to, amount0);
         SafeTransferLib.safeTransfer(_token1, to, amount1);
@@ -217,48 +212,56 @@ contract UniswapV2Pair is ERC20 {
         _update(balance0, balance1, _reserve0, _reserve1);
         if (feeOn) kLast = uint(reserve0) * (reserve1); // reserve0 and reserve1 are up-to-date
 
-        // sort tokens
-        (address _tokenA,) = _sortTokens(_token0, _token1);
-        (uint amountA, uint amountB) = tokenA == _tokenA ? (amount0, amount1) : (amount1, amount0);
-
-        // check for slippage
-        require(amountA >= amountAMin, "INSUFFICIENT_A_AMOUNT");
-        require(amountB >= amountBMin, "INSUFFICIENT_B_AMOUNT");
-
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
-    function burnETH(
-        address token,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-    ) external ensure(deadline) lock returns (uint amountToken, uint amountETH) {
-      // transfer in pair token
-      SafeTransferLib.safeTransferFrom(address(this), msg.sender, address(this), liquidity);
+    function swapExactTokensForTokens(
+      uint amountIn,
+      uint amountOutMin,
+      address[] calldata path,
+      address to,
+      uint deadline
+    ) external ensure(deadline) returns (uint amountOut) {
+      (address _token0,) = UniswapV2Library.sortTokens(path[0], path[1]);
+      (uint reserveIn, uint reserveOut) = path[0] == _token0 ? (reserve0, reserve1) : (reserve1, reserve0);
 
-      burn(
-        token,
-        WETH,
-        liquidity,
-        amountTokenMin,
-        amountETHMin,
-        address(this),
-        deadline
-      );
+      // get amount out
+      amountOut = UniswapV2Library.getAmountOut(amountIn, reserveIn, reserveOut);
+      require(amountOut >= amountOutMin, "INSUFFICIENT_OUTPUT_AMOUNT");
 
-      IERC20(token).safeTransfer(to, amountToken);
-      IWETH(WETH).withdraw(amountETH);
-      (bool success,) = to.call{value: amountETH}("");
-      require(success, "ETH_TRANSFER_FAILED");
+      // transfer in token to swap
+      SafeTransferLib.safeTransferFrom(path[0], msg.sender, address(this), amountIn);
+
+      (uint amount0Out, uint amount1Out) = path[0] == _token0 ? (uint(0), amountOut) : (amountOut, uint(0));
+      swap(amount0Out, amount1Out, to, new bytes(0));
     }
 
-    // TODO burn with permit
+    function swapTokensForExactTokens(
+      uint amountOut,
+      uint amountInMax,
+      address[] calldata path,
+      address to,
+      uint deadline
+    ) external ensure(deadline) returns (uint amountIn) {
+      (address _token0,) = UniswapV2Library.sortTokens(path[0], path[1]);
+      (uint reserveIn, uint reserveOut) = path[0] == _token0 ? (reserve0, reserve1) : (reserve1, reserve0);
 
+      amountIn = UniswapV2Library.getAmountIn(amountOut, reserveIn, reserveOut);
+      require(amountIn <= amountInMax, "EXCESSIVE_INPUT_AMOUNT");
 
-    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {
+      // transfer in token to swap
+      SafeTransferLib.safeTransferFrom(path[0], msg.sender, address(this), amountIn);
+
+      (uint amount0Out, uint amount1Out) = path[0] == _token0 ? (uint(0), amountOut) : (amountOut, uint(0));
+      swap(amount0Out, amount1Out, to, new bytes(0));
+    }
+
+    function swap(
+      uint amount0Out,
+      uint amount1Out,
+      address to,
+      bytes memory data
+    ) public lock {
         require(amount0Out > 0 || amount1Out > 0, "INSUFFICIENT_OUTPUT_AMOUNT");
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
         require(amount0Out < _reserve0 && amount1Out < _reserve1, "INSUFFICIENT_LIQUIDITY");
@@ -269,8 +272,8 @@ contract UniswapV2Pair is ERC20 {
         address _token0 = token0;
         address _token1 = token1;
         require(to != _token0 && to != _token1, "INVALID_TO");
-        if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
-        if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
+        if (amount0Out > 0) SafeTransferLib.safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
+        if (amount1Out > 0) SafeTransferLib.safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
         if (data.length > 0) IUniswapV2Callee(to).uniswapV2Call(msg.sender, amount0Out, amount1Out, data);
         balance0 = IERC20(_token0).balanceOf(address(this));
         balance1 = IERC20(_token1).balanceOf(address(this));
@@ -292,8 +295,8 @@ contract UniswapV2Pair is ERC20 {
     function skim(address to) external lock {
         address _token0 = token0; // gas savings
         address _token1 = token1; // gas savings
-        _safeTransfer(_token0, to, IERC20(_token0).balanceOf(address(this)) - (reserve0));
-        _safeTransfer(_token1, to, IERC20(_token1).balanceOf(address(this)) - (reserve1));
+        SafeTransferLib.safeTransfer(_token0, to, IERC20(_token0).balanceOf(address(this)) - (reserve0));
+        SafeTransferLib.safeTransfer(_token1, to, IERC20(_token1).balanceOf(address(this)) - (reserve1));
     }
 
     // force reserves to match balances
@@ -319,20 +322,14 @@ contract UniswapV2Pair is ERC20 {
         } else {
             uint amountBOptimal = UniswapV2Library.quote(amountADesired, reserveA, reserveB);
             if (amountBOptimal <= amountBDesired) {
-                require(amountBOptimal >= amountBMin, "UniswapV2Router: INSUFFICIENT_B_AMOUNT");
+                require(amountBOptimal >= amountBMin, "INSUFFICIENT_B_AMOUNT");
                 (amountA, amountB) = (amountADesired, amountBOptimal);
             } else {
                 uint amountAOptimal = UniswapV2Library.quote(amountBDesired, reserveB, reserveA);
                 assert(amountAOptimal <= amountADesired);
-                require(amountAOptimal >= amountAMin, "UniswapV2Router: INSUFFICIENT_A_AMOUNT");
+                require(amountAOptimal >= amountAMin, "INSUFFICIENT_A_AMOUNT");
                 (amountA, amountB) = (amountAOptimal, amountBDesired);
             }
         }
-    }
-
-  function _sortTokens(address tokenA, address tokenB) internal pure returns (address _token0, address _token1) {
-        require(tokenA != tokenB, "UniswapV2Library: IDENTICAL_ADDRESSES");
-        (_token0, _token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        require(_token0 != address(0), "UniswapV2Library: ZERO_ADDRESS");
     }
 }
