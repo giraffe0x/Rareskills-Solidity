@@ -6,6 +6,7 @@ import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
 import { UniswapV2Library } from "./libraries/UniswapV2Library.sol";
 import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
 
+
 import { IWETH } from "./interfaces/IWETH.sol";
 import { IERC20 } from "./interfaces/IERC20.sol";
 import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
@@ -15,7 +16,6 @@ import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
 // import { console } from "forge-std/console.sol";
 
 contract UniswapV2Pair is ERC20 {
-    // using UQ112x112 for uint224;
     using SafeTransferLib for IERC20;
 
     uint public constant MINIMUM_LIQUIDITY = 10**3;
@@ -90,14 +90,14 @@ contract UniswapV2Pair is ERC20 {
 
     // update reserves and, on the first call per block, price accumulators
     function _update(uint balance0, uint balance1, uint112 _reserve0 , uint112 _reserve1) private {
-        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+        uint32 blockTimestamp = uint32(block.timestamp);
         unchecked {
           uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
 
           if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
-              // * never overflows, and + overflow is desired
-              price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
-              price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+            // * never overflows, and + overflow is desired
+            price0CumulativeLast += (uint256(_reserve1) * 1e18 / _reserve0) * timeElapsed;
+            price1CumulativeLast += (uint256(_reserve0) * 1e18 / _reserve1) * timeElapsed;
           }
         }
         reserve0 = uint112(balance0);
