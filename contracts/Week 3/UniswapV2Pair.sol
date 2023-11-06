@@ -89,14 +89,17 @@ contract UniswapV2Pair is ERC20 {
     }
 
     // update reserves and, on the first call per block, price accumulators
-    function _update(uint balance0, uint balance1, uint112 /*_reserve0*/ , uint112 /*_reserve1*/) private {
+    function _update(uint balance0, uint balance1, uint112 _reserve0 , uint112 _reserve1) private {
         uint32 blockTimestamp = uint32(block.timestamp % 2**32);
-        // uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
-        // if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
-        //     // * never overflows, and + overflow is desired
-        //     price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
-        //     price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
-        // }
+        unchecked {
+          uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
+
+          if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
+              // * never overflows, and + overflow is desired
+              price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
+              price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+          }
+        }
         reserve0 = uint112(balance0);
         reserve1 = uint112(balance1);
         blockTimestampLast = blockTimestamp;
@@ -133,7 +136,7 @@ contract UniswapV2Pair is ERC20 {
       uint amountBMin,
       address to,
       uint deadline) external ensure(deadline) lock returns (uint amountA, uint amountB, uint liquidity) {
-
+        // Get correct amount of A/B to transfer in
         (amountA, amountB) = _addLiquidity(
           tokenA,
           tokenB,
@@ -142,7 +145,7 @@ contract UniswapV2Pair is ERC20 {
           amountAMin,
           amountBMin
         );
-
+        // Transfer in tokenA/B
         SafeTransferLib.safeTransferFrom(tokenA, msg.sender, address(this), amountA);
         SafeTransferLib.safeTransferFrom(tokenB, msg.sender, address(this), amountB);
 
