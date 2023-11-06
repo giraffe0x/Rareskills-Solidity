@@ -19,6 +19,11 @@ contract UniswapV2Pair is ERC20 {
     using SafeTransferLib for IERC20;
 
     uint public constant MINIMUM_LIQUIDITY = 10**3;
+    uint private constant SAFE_MULTIPLIER = 1e18;
+    uint private constant SWAP_FEE = 3;
+    // If turned on, fee of 0.05% per trade. This represents ⅙th of the 0.30% fee.
+    uint private constant PROTOCOL_FEE = 5;
+    uint private constant BASE = 1000;
     bytes4 private constant SELECTOR = bytes4(keccak256(bytes("transfer(address,uint256)")));
 
     address public immutable factory;
@@ -26,6 +31,7 @@ contract UniswapV2Pair is ERC20 {
     address public token0;
     address public token1;
 
+    // TODO replace with custom data types
     uint112 private reserve0;           // uses single storage slot, accessible via getReserves
     uint112 private reserve1;           // uses single storage slot, accessible via getReserves
     uint32  private blockTimestampLast; // uses single storage slot, accessible via getReserves
@@ -34,8 +40,8 @@ contract UniswapV2Pair is ERC20 {
     uint public price1CumulativeLast;
     uint public kLast; // reserve0 * reserve1, as of immediately after the most recent liquidity event
 
-    string internal _name = "Pair";
-    string internal _symbol = "Pair";
+    string public constant NAME = "Uniswap V2";
+    string public constant SYMBOL = "UNI-V2";
 
     uint private unlocked = 2;
     modifier lock() {
@@ -50,12 +56,12 @@ contract UniswapV2Pair is ERC20 {
         _;
     }
 
-    function name() public view override returns (string memory) {
-        return _name;
+    function name() public pure override returns (string memory) {
+        return NAME;
     }
 
-    function symbol() public view override returns (string memory) {
-        return _symbol;
+    function symbol() public pure override returns (string memory) {
+        return SYMBOL;
     }
 
     function getReserves() public view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast) {
@@ -96,8 +102,8 @@ contract UniswapV2Pair is ERC20 {
 
           if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
             // * never overflows, and + overflow is desired
-            price0CumulativeLast += (uint256(_reserve1) * 1e18 / _reserve0) * timeElapsed;
-            price1CumulativeLast += (uint256(_reserve0) * 1e18 / _reserve1) * timeElapsed;
+            price0CumulativeLast += (uint256(_reserve1) * SAFE_MULTIPLIER / _reserve0) * timeElapsed;
+            price1CumulativeLast += (uint256(_reserve0) * SAFE_MULTIPLIER / _reserve1) * timeElapsed;
           }
         }
         reserve0 = uint112(balance0);
@@ -117,7 +123,7 @@ contract UniswapV2Pair is ERC20 {
                 uint rootKLast = FixedPointMathLib.sqrt(_kLast);
                 if (rootK > rootKLast) {
                     uint numerator = totalSupply() * (rootK - (rootKLast));
-                    uint denominator = rootK * (5) + (rootKLast);
+                    uint denominator = rootK * (PROTOCOL_FEE) + (rootKLast);
                     uint liquidity = numerator / denominator;
                     if (liquidity > 0) _mint(feeTo, liquidity);
                 }
@@ -285,9 +291,9 @@ contract UniswapV2Pair is ERC20 {
         uint amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
         require(amount0In > 0 || amount1In > 0, "INSUFFICIENT_INPUT_AMOUNT");
         { // scope for reserve{0,1}Adjusted, avoids stack too deep errors
-        uint balance0Adjusted = balance0 * (1000) - (amount0In * (3));
-        uint balance1Adjusted = balance1 * (1000) - (amount1In * (3));
-        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (1000**2), "K");
+        uint balance0Adjusted = balance0 * (BASE) - (amount0In * (SWAP_FEE));
+        uint balance1Adjusted = balance1 * (BASE) - (amount1In * (SWAP_FEE));
+        require(balance0Adjusted * (balance1Adjusted) >= uint(_reserve0) * (_reserve1) * (BASE**2), "K");
         }
 
         _update(balance0, balance1, _reserve0, _reserve1);
