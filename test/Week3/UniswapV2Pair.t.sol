@@ -21,13 +21,13 @@ contract UniswapV2PairTest is Test {
 
     tokenA = new ERC20Token();
     tokenB = new ERC20Token();
-    console2.log("tokenA address: %s", address(tokenA));
-    console2.log("tokenB address: %s", address(tokenB));
+    // console2.log("tokenA address: %s", address(tokenA));
+    // console2.log("tokenB address: %s", address(tokenB));
 
     factory = new UniswapV2Factory(owner);
     pair = UniswapV2Pair(factory.createPair(address(tokenA), address(tokenB)));
-    console2.log("factory address: %s", address(factory));
-    console2.log("pair address: %s", address(pair));
+    // console2.log("factory address: %s", address(factory));
+    // console2.log("pair address: %s", address(pair));
 
     // deal
     deal(address(tokenA), owner, 100e18);
@@ -38,8 +38,8 @@ contract UniswapV2PairTest is Test {
     // approve
     tokenA.approve(address(pair), 100e18);
     tokenB.approve(address(pair), 100e18);
-    console2.log("pair bytecode:");
-    console2.logBytes32(keccak256(type(UniswapV2Pair).creationCode));
+    // console2.log("pair bytecode:");
+    // console2.logBytes32(keccak256(type(UniswapV2Pair).creationCode));
 
     // seed lp
     pair.mint(
@@ -74,7 +74,6 @@ contract UniswapV2PairTest is Test {
 
     uint lpBalance = pair.balanceOf(user);
     assertTrue(lpBalance > 0, "lp balance should be greater than 0");
-    console2.log("lp balance: %s", lpBalance);
   }
 
   function testBurn() external {
@@ -99,7 +98,6 @@ contract UniswapV2PairTest is Test {
     uint tokenBbalance = tokenB.balanceOf(user);
     uint lpBalance = pair.balanceOf(user);
     assertTrue(lpBalance > 0, "lp balance should be greater than 0");
-    console2.log("lp balance: %s", lpBalance);
 
     // should be able to burn lp token
     pair.burn(
@@ -112,7 +110,6 @@ contract UniswapV2PairTest is Test {
 
     lpBalance = pair.balanceOf(user);
     assertTrue(lpBalance == 0, "lp balance should be 0");
-    console2.log("lp balance: %s", lpBalance);
     assertTrue(tokenA.balanceOf(user) > tokenAbalance, "tokenA balance should be greater than before");
     assertTrue(tokenB.balanceOf(user) > tokenBbalance, "tokenB balance should be greater than before");
   }
