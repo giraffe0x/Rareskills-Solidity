@@ -17,11 +17,15 @@ contract UniswapV2Factory {
         feeToSetter = _feeToSetter;
     }
 
+    /// @dev Create a new pair for two tokens.
+    /// @param tokenA The first token of the pair.
+    /// @param tokenB The second token of the pair.
+    /// @return pair The address of the new pair.
     function createPair(address tokenA, address tokenB) external returns (address pair) {
-        require(tokenA != tokenB, 'UniswapV2: IDENTICAL_ADDRESSES');
+        require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        require(token0 != address(0), 'UniswapV2: ZERO_ADDRESS');
-        require(getPair[token0][token1] == address(0), 'UniswapV2: PAIR_EXISTS'); // single check is sufficient
+        require(token0 != address(0), "ZERO_ADDRESS");
+        require(getPair[token0][token1] == address(0), "PAIR_EXISTS"); // single check is sufficient
         bytes32 salt = keccak256(abi.encodePacked(token0, token1));
         UniswapV2Pair _pair = new UniswapV2Pair{salt: salt}();
         pair = address(_pair);
@@ -33,25 +37,22 @@ contract UniswapV2Factory {
         emit PairCreated(token0, token1, pair, allPairs.length);
     }
 
+    /// @dev Set the feeTo address.
+    /// @param _feeTo The new feeTo address.
     function setFeeTo(address _feeTo) external {
-        require(msg.sender == feeToSetter, "UniswapV2: FORBIDDEN");
+        require(msg.sender == feeToSetter, "FORBIDDEN");
         feeTo = _feeTo;
     }
 
+    /// @dev Set the feeToSetter address.
+    /// @param _feeToSetter The new feeToSetter address.
     function setFeeToSetter(address _feeToSetter) external {
-        require(msg.sender == feeToSetter, "UniswapV2: FORBIDDEN");
+        require(msg.sender == feeToSetter, "FORBIDDEN");
         feeToSetter = _feeToSetter;
     }
 
+    /// @dev Get the length of allPairs.
     function allPairsLength() external view returns (uint) {
         return allPairs.length;
     }
-
-    // function sortTokens(address tokenA, address tokenB) internal pure returns (address token0, address token1) {
-    //     require(tokenA != tokenB, "IDENTICAL_ADDRESSES");
-    //     (token0, token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-    //     require(token0 != address(0), "ZERO_ADDRESS");
-    // }
-       // calculates the CREATE2 address for a pair without making any external calls
-
 }

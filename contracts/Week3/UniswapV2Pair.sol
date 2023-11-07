@@ -12,7 +12,7 @@ import { IERC20 } from "./interfaces/IERC20.sol";
 import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 import { IERC3156FlashBorrower } from "./interfaces/IERC3156FlashBorrower.sol";
 import { IERC3156FlashLender } from "./interfaces/IERC3156FlashLender.sol";
-import { console } from "forge-std/console.sol";
+// import { console } from "forge-std/console.sol";
 
 contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
     using SafeTransferLib for IERC20;
@@ -30,7 +30,6 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
     address public token1;
 
     // TODO replace with custom data types
-    // TODO Natspec
     uint112 private reserve0;           // uses single storage slot, accessible via getReserves
     uint112 private reserve1;           // uses single storage slot, accessible via getReserves
     uint32  private blockTimestampLast; // uses single storage slot, accessible via getReserves
@@ -64,13 +63,27 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
         factory = msg.sender;
     }
 
-    // called once by the factory at time of deployment
+    /// @dev called once by the factory at time of deployment
+    /// @param _token0 Address of token 0
+    /// @param _token1 Address of token 1
     function initialize(address _token0, address _token1) external {
         require(msg.sender == factory, "FORBIDDEN"); // sufficient check
         token0 = _token0;
         token1 = _token1;
     }
 
+    /// @dev Add liquidity function
+    /// @param tokenA Address of token A
+    /// @param tokenB Address of token B
+    /// @param amountADesired Amount of token A desired to add
+    /// @param amountBDesired Amount of token B desired to add
+    /// @param amountAMin Minimum amount of token A to add
+    /// @param amountBMin Minimum amount of token B to add
+    /// @param to Address to send liquidity tokens to
+    /// @param deadline Deadline for transaction
+    /// @return amountA Amount of token A added
+    /// @return amountB Amount of token B added
+    /// @return liquidity Amount of liquidity tokens minted
     function mint(
       address tokenA,
       address tokenB,
@@ -121,6 +134,14 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
         emit Mint(msg.sender, amount0, amount1);
     }
 
+    /// @dev Remove liquidity function
+    /// @param liquidity Amount of liquidity tokens to remove
+    /// @param amountAMin Minimum amount of token A to remove
+    /// @param amountBMin Minimum amount of token B to remove
+    /// @param to Address to send tokens to
+    /// @param deadline Deadline for transaction
+    /// @return amount0 Amount of token A removed
+    /// @return amount1 Amount of token B removed
     function burn(
       uint liquidity,
       uint amountAMin,
@@ -169,6 +190,13 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
+    /// @dev Swap exact tokens for tokens
+    /// @param amountIn Amount of token to swap in
+    /// @param amountOutMin Minimum amount of token to swap out
+    /// @param path Path of tokens to swap
+    /// @param to Address to send tokens to
+    /// @param deadline Deadline for transaction
+    /// @return amountOut Amount of token swapped out
     function swapExactTokensForTokens(
       uint amountIn,
       uint amountOutMin,
@@ -190,6 +218,13 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
       swap(amount0Out, amount1Out, to);
     }
 
+    /// @dev Swap tokens for exact tokens
+    /// @param amountOut Amount of token to swap out
+    /// @param amountInMax Maximum amount of token to swap in
+    /// @param path Path of tokens to swap
+    /// @param to Address to send tokens to
+    /// @param deadline Deadline for transaction
+    /// @return amountIn Amount of token swapped in
     function swapTokensForExactTokens(
       uint amountOut,
       uint amountInMax,
@@ -210,6 +245,10 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
       swap(amount0Out, amount1Out, to);
     }
 
+    /// @dev Swap exact tokens for tokens, should not be called directly
+    /// @param amount0Out Amount of token 0 to receive
+    /// @param amount1Out Amount of token 1 to receive
+    /// @param to Address to send tokens to
     function swap(
       uint amount0Out,
       uint amount1Out,
@@ -244,6 +283,12 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
     }
 
+    /// @dev Flash loan function, ERC3156 compliant
+    /// @param receiver Address of receiver
+    /// @param token Address of token to flash loan
+    /// @param amount Amount of token to flash loan
+    /// @param data Data to send to receiver
+    /// @return bool True if successful
     function flashLoan(
       IERC3156FlashBorrower receiver,
       address token,
@@ -273,7 +318,8 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
         return true;
     }
 
-    // force balances to match reserves
+    /// @dev force balances to match reserves
+    /// @param to Address to send tokens to
     function skim(address to) external nonReentrant {
         address _token0 = token0; // gas savings
         address _token1 = token1; // gas savings
@@ -281,11 +327,12 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
         SafeTransferLib.safeTransfer(_token1, to, IERC20(_token1).balanceOf(address(this)) - (reserve1));
     }
 
-    // force reserves to match balances
+    /// @dev force reserves to match balances
     function sync() external nonReentrant {
         _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
     }
 
+    /* ================== VIEWS =================== */
     function name() public pure override returns (string memory) {
         return NAME;
     }
@@ -299,8 +346,6 @@ contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
         _reserve1 = reserve1;
         _blockTimestampLast = blockTimestampLast;
     }
-
-    /* ================== VIEW FUNCTIONS =================== */
 
     function flashFee(address token, uint256 amount) external view returns (uint256) {
         require(token == token0 || token == token1, "INVALID_TOKEN");
