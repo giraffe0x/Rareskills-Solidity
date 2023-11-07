@@ -5,7 +5,7 @@ import { Test, console2 } from "forge-std/Test.sol";
 import { UniswapV2Pair } from "../../contracts/Week3/UniswapV2Pair.sol";
 import { UniswapV2Factory } from "../../contracts/Week3/UniswapV2Factory.sol";
 import { ERC20Token } from "../../contracts/Week2/ERC20Token.sol";
-
+import { IERC3156FlashBorrower } from "../../contracts/Week3/interfaces/IERC3156FlashBorrower.sol";
 
 contract UniswapV2PairTest is Test {
   address public owner = address(0x1);
@@ -171,5 +171,31 @@ contract UniswapV2PairTest is Test {
     uint tokenBbalanceAfter = tokenB.balanceOf(user);
     assertTrue(tokenAbalanceAfter < tokenAbalanceBefore, "tokenA balance should be less than before");
     assertEq(tokenBbalanceAfter, tokenBbalanceBefore + 10e18, "tokenB balance should be greater than before");
+  }
+
+  function testFlashLoan() external {
+      vm.startPrank(address(this));
+      deal(address(tokenA), address(this), 100e18);
+      tokenA.approve(address(pair), 100e18);
+      tokenB.approve(address(pair), 100e18);
+
+      // should be able to flash loan
+      pair.flashLoan(
+        IERC3156FlashBorrower(address(this)),
+        address(tokenA),
+        10e18,
+        abi.encodeWithSelector(this.onFlashLoan.selector)
+      );
+  }
+
+  function onFlashLoan(
+    address initiator,
+    address token,
+    uint amount,
+    uint fee,
+    bytes calldata data
+  ) external pure returns (bytes32) {
+    // console2.log("onFlashLoan");
+    return keccak256("ERC3156FlashBorrower.onFlashLoan");
   }
 }
