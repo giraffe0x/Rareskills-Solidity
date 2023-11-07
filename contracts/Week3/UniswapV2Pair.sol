@@ -12,7 +12,7 @@ import { IERC20 } from "./interfaces/IERC20.sol";
 import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 import { IERC3156FlashBorrower } from "./interfaces/IERC3156FlashBorrower.sol";
 import { IERC3156FlashLender } from "./interfaces/IERC3156FlashLender.sol";
-// import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
+import { console } from "forge-std/console.sol";
 
 contract UniswapV2Pair is ERC20, ReentrancyGuard, IERC3156FlashLender {
     using SafeTransferLib for IERC20;

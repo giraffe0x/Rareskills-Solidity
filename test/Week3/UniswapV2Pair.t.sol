@@ -74,6 +74,102 @@ contract UniswapV2PairTest is Test {
 
     uint lpBalance = pair.balanceOf(user);
     assertTrue(lpBalance > 0, "lp balance should be greater than 0");
+    console2.log("lp balance: %s", lpBalance);
+  }
 
+  function testBurn() external {
+    vm.startPrank(user);
+
+    tokenA.approve(address(pair), 100e18);
+    tokenB.approve(address(pair), 100e18);
+
+    // should be able to mint lp token
+    pair.mint(
+      address(tokenA),
+      address(tokenB),
+      10e18,
+      5e18,
+      0,
+      0,
+      address(user),
+      block.timestamp
+    );
+
+    uint tokenAbalance = tokenA.balanceOf(user);
+    uint tokenBbalance = tokenB.balanceOf(user);
+    uint lpBalance = pair.balanceOf(user);
+    assertTrue(lpBalance > 0, "lp balance should be greater than 0");
+    console2.log("lp balance: %s", lpBalance);
+
+    // should be able to burn lp token
+    pair.burn(
+      lpBalance,
+      9.9e18,
+      4.9e18,
+      address(user),
+      block.timestamp
+    );
+
+    lpBalance = pair.balanceOf(user);
+    assertTrue(lpBalance == 0, "lp balance should be 0");
+    console2.log("lp balance: %s", lpBalance);
+    assertTrue(tokenA.balanceOf(user) > tokenAbalance, "tokenA balance should be greater than before");
+    assertTrue(tokenB.balanceOf(user) > tokenBbalance, "tokenB balance should be greater than before");
+  }
+
+  function testSwapExact() external {
+    vm.startPrank(user);
+
+    tokenA.approve(address(pair), 100e18);
+    tokenB.approve(address(pair), 100e18);
+
+    // should be able to swap A for B
+    address[] memory path = new address[](2);
+    path[0] = address(tokenA);
+    path[1] = address(tokenB);
+
+    uint tokenAbalanceBefore = tokenA.balanceOf(user);
+    uint tokenBbalanceBefore = tokenB.balanceOf(user);
+
+    pair.swapExactTokensForTokens(
+      10e18,
+      0,
+      path,
+      address(user),
+      block.timestamp
+    );
+
+    uint tokenAbalanceAfter = tokenA.balanceOf(user);
+    uint tokenBbalanceAfter = tokenB.balanceOf(user);
+    assertEq(tokenAbalanceAfter, (tokenAbalanceBefore - 10e18), "tokenA balance incorrect");
+    assertTrue(tokenBbalanceAfter > tokenBbalanceBefore, "tokenB balance should be greater than before");
+  }
+
+  function testSwapForExact() external {
+    vm.startPrank(user);
+
+    tokenA.approve(address(pair), 100e18);
+    tokenB.approve(address(pair), 100e18);
+
+    // should be able to swap A for B
+    address[] memory path = new address[](2);
+    path[0] = address(tokenA);
+    path[1] = address(tokenB);
+
+    uint tokenAbalanceBefore = tokenA.balanceOf(user);
+    uint tokenBbalanceBefore = tokenB.balanceOf(user);
+
+    pair.swapTokensForExactTokens(
+      10e18,
+      26e18,
+      path,
+      address(user),
+      block.timestamp
+    );
+
+    uint tokenAbalanceAfter = tokenA.balanceOf(user);
+    uint tokenBbalanceAfter = tokenB.balanceOf(user);
+    assertTrue(tokenAbalanceAfter < tokenAbalanceBefore, "tokenA balance should be less than before");
+    assertEq(tokenBbalanceAfter, tokenBbalanceBefore + 10e18, "tokenB balance should be greater than before");
   }
 }
