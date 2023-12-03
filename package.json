@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@openzeppelin/merkle-tree": "^1.0.5",
+    "python": "^0.0.4",
     "solhint": "^3.6.2"
   },
   "type": "module"
