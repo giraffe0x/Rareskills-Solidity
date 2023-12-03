@@ -34,6 +34,10 @@ contract NFTEnumerableTest is Test {
     assertEq(nftSearcher.searchForPrime(address(0x5)), 2);
     // address 0x6 holds id 15,16,17,18,19,20
     assertEq(nftSearcher.searchForPrime(address(0x6)), 2);
+    // address 0x7 holds id 21,22,23,24,25,26,27
+    assertEq(nftSearcher.searchForPrime(address(0x7)), 1);
+    // addresss 0x8 holds 27,28,29,30,31
+    assertEq(nftSearcher.searchForPrime(address(0x8)), 2);
   }
 
   function test_searchForPrimeOptimized() external {
@@ -49,5 +53,9 @@ contract NFTEnumerableTest is Test {
     assertEq(nftSearcher.searchForPrimeOptimized(address(0x5)), 2);
     // address 0x6 holds id 15,16,17,18,19,20
     assertEq(nftSearcher.searchForPrimeOptimized(address(0x6)), 2);
+    // address 0x7 holds id 21,22,23,24,25,26,27
+    assertEq(nftSearcher.searchForPrimeOptimized(address(0x7)), 1);
+    // addresss 0x8 holds 49
+    assertEq(nftSearcher.searchForPrimeOptimized(address(0x8)), 2);
   }
 }

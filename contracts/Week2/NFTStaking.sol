@@ -4,6 +4,8 @@ pragma solidity 0.8.21;
 import { ERC20Token } from "./ERC20Token.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
+import { console } from "forge-std/console.sol";
+
 contract NFTStaking {
   ERC20Token public immutable erc20token;
   IERC721 public immutable erc721token;
@@ -35,7 +37,7 @@ contract NFTStaking {
   ) external returns(bytes4) {
     // do not use msg.sender here as it will be the ERC721 contract
     require(msg.sender == address(erc721token), "Not ERC721 token");
-    
+
     users[_from] = User(block.timestamp, _tokenId);
     emit Stake(_from, _tokenId);
 
@@ -77,14 +79,14 @@ contract NFTStaking {
   }
 
   function withdraw() external {
-    User storage user = users[msg.sender];
+    User memory user = users[msg.sender];
     require(user.lastClaimedTimestamp != 0, "Not staked");
-
-    // reset user data
-    delete users[msg.sender];
 
     // transfer accrued reward to user
     claim();
+
+    // reset user data
+    delete users[msg.sender];
 
     // transfer NFT back to user
     erc721token.transferFrom(
@@ -92,6 +94,8 @@ contract NFTStaking {
       msg.sender,
       user.stakedTokenId
     );
+
+
 
     emit Withdraw(msg.sender, user.stakedTokenId);
   }
