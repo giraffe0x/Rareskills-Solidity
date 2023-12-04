@@ -2,7 +2,7 @@
 pragma solidity 0.8.21;
 pragma abicoder v2;
 
-import { TokenWhaleChallenge } from "../../contracts/Week5/Ethernaut_TokenWhale.sol";
+import { TokenWhaleChallenge } from "../../contracts/Week7/Ethernaut_TokenWhale.sol";
 import { Test, console2 } from "forge-std/Test.sol";
 
 contract TokenWhaleSolve is Test {

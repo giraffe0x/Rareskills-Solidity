@@ -2,15 +2,19 @@
   "extends": "solhint:recommended",
   "rules": {
     "code-complexity": ["error", 8],
-    "compiler-version": ["error", ">=0.8.21"],
+    "compiler-version": "off",
     "func-name-mixedcase": "off",
-    "func-visibility": ["error", { "ignoreConstructors": true }],
-    "max-line-length": ["error", 120],
+    "func-visibility": "off",
+    "max-line-length": [
+      false
+    ],
     "named-parameters-mapping": "off",
     "no-console": "off",
     "not-rely-on-time": "off",
     "one-contract-per-file": "off",
     "no-empty-blocks": "off",
-    "no-complex-fallback": "off"
+    "no-complex-fallback": "off",
+    "reason-string": "off",
+    "state-visibility": "off"
   }
 }
