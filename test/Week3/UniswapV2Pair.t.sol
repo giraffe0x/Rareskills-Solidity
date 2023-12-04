@@ -186,11 +186,11 @@ contract UniswapV2PairTest is Test {
   }
 
   function onFlashLoan(
-    address initiator,
-    address token,
-    uint amount,
-    uint fee,
-    bytes calldata data
+    address /*initiator*/,
+    address /*token*/,
+    uint /*amount*/,
+    uint /*fee*/,
+    bytes calldata /*data*/
   ) external pure returns (bytes32) {
     // console2.log("onFlashLoan");
     return keccak256("ERC3156FlashBorrower.onFlashLoan");

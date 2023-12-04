@@ -7,5 +7,5 @@
   },
   "npm.exclude": "**/lib/**",
   "solidity.formatter": "forge",
-  "solidity.compileUsingRemoteVersion": "v0.4.21+commit.dfe3193c"
+  "solidity.compileUsingRemoteVersion": "v0.8.21+commit.d9974bed"
 }

@@ -113,7 +113,7 @@ contract NFTSTakingTest is Test {
     assertEq(erc20Token.balanceOf(buyer2), 15);
     assertEq(erc721Token.ownerOf(1), address(nftStaker));
 
-    (uint256 lastTS, uint256 stakedTokenId) = nftStaker.users(buyer2);
+    // (uint256 lastTS, uint256 stakedTokenId) = nftStaker.users(buyer2);
 
     vm.startPrank(buyer2);
     nftStaker.withdraw();

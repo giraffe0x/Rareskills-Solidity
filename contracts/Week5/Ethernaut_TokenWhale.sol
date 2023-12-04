@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.7.6;
+pragma solidity 0.8.21;
 
 import { console } from "forge-std/console.sol";
 
-// This ERC20-compatible token is hard to acquire. There’s a fixed supply of 1,000 tokens, all of which are yours to start with.
+// This ERC20-compatible token is hard to acquire. T
+//here’s a fixed supply of 1,000 tokens, all of which are yours to start with.
 
 // Find a way to accumulate at least 1,000,000 tokens to solve this challenge.
 
