@@ -1,0 +1,4 @@
+StakingRewardsOptimizedTest:testGetReward() (gas: 200052)
+StakingRewardsOptimizedTest:testStake() (gas: 112020)
+StakingRewardsOptimizedTest:testStakeAndExit() (gas: 209290)
+StakingRewardsOptimizedTest:testWithdraw() (gas: 190607)
