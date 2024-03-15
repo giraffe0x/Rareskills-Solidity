@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 // import "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
 import "@openzeppelin/contracts/token/ERC20/Utils/SafeERC20.sol";
@@ -16,16 +16,15 @@ contract StakingRewardsOptimized is IStakingRewards, RewardsDistributionRecipien
 
     /* ========== STATE VARIABLES ========== */
 
-    IERC20 public rewardsToken;
-    IERC20 public stakingToken;
-    // uint256 public periodFinish = 0;
+    //@audit changed tokens to immutable
+    IERC20 public immutable rewardsToken;
+    IERC20 public immutable stakingToken;
+
+    //@audit changed time variables to uint32
     uint32 public periodFinish;
-    // uint256 public rewardsDuration = 7 days;
     uint32 public rewardsDuration = 7 days;
-    // uint256 public lastUpdateTime;
     uint32 public lastUpdateTime;
 
-    // uint256 public rewardRate = 0;
     uint256 public rewardRate;
     uint256 public rewardPerTokenStored;
 

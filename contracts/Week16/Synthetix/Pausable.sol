@@ -6,8 +6,8 @@ import "./Owned.sol";
 
 // https://docs.synthetix.io/contracts/source/contracts/pausable
 abstract contract Pausable is Owned {
-    uint public lastPauseTime;
-    bool public paused;
+    uint32 public lastPauseTime;
+    uint32 public paused = 1;
 
     constructor() {
         // This contract is abstract, and thus cannot be instantiated directly
@@ -19,7 +19,7 @@ abstract contract Pausable is Owned {
      * @notice Change the paused state of the contract
      * @dev Only the contract owner may call this.
      */
-    function setPaused(bool _paused) external onlyOwner {
+    function setPaused(uint32 _paused) external onlyOwner {
         // Ensure we're actually changing the state before we do anything
         if (_paused == paused) {
             return;
@@ -29,18 +29,18 @@ abstract contract Pausable is Owned {
         paused = _paused;
 
         // If applicable, set the last pause time.
-        if (paused) {
-            lastPauseTime = block.timestamp;
+        if (paused == 2) {
+            lastPauseTime = uint32(block.timestamp);
         }
 
         // Let everyone know that our pause state has changed.
-        emit PauseChanged(paused);
+        emit PauseChanged(_paused);
     }
 
-    event PauseChanged(bool isPaused);
+    event PauseChanged(uint32 isPaused);
 
     modifier notPaused {
-        require(!paused, "This action cannot be performed while the contract is paused");
+        require(paused == 1, "This action cannot be performed while the contract is paused");
         _;
     }
 }
