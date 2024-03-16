@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity 0.8.21;
 
 import { Test, console } from "forge-std/Test.sol";
 import {StakingRewardsOptimized} from "./../../../contracts/Week16/Synthetix/StakingRewardsOptimized.sol";
