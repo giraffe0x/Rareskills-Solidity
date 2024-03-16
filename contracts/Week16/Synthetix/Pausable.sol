@@ -6,7 +6,9 @@ import "./Owned.sol";
 
 // https://docs.synthetix.io/contracts/source/contracts/pausable
 abstract contract Pausable is Owned {
+    //@audit changed to uint32
     uint32 public lastPauseTime;
+    //@audit used 0/1 instead of bool
     uint32 public paused = 1;
 
     constructor() {

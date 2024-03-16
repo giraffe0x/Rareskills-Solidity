@@ -6,12 +6,12 @@ import "@openzeppelin/contracts/token/ERC20/Utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 // Inheritance
-import "./IStakingRewards.sol";
+import "./IStakingRewardsOptimized.sol";
 import "./RewardsDistributionRecipient.sol";
 import "./Pausable.sol";
 
 // https://docs.synthetix.io/contracts/source/contracts/stakingrewards
-contract StakingRewardsOptimized is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard, Pausable {
+contract StakingRewardsOptimized is IStakingRewardsOptimized, RewardsDistributionRecipient, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     /* ========== STATE VARIABLES ========== */
@@ -31,27 +31,27 @@ contract StakingRewardsOptimized is IStakingRewards, RewardsDistributionRecipien
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
-    uint256 private _totalSupply;
+    uint256 public totalSupply;
     mapping(address => uint256) private _balances;
+
+    //@audit added
+    uint256 constant MULTIPLIER = 1e18;
 
     /* ========== CONSTRUCTOR ========== */
 
+    //@audit marked payable to save gas
     constructor(
         address _owner,
         address _rewardsDistribution,
         address _rewardsToken,
         address _stakingToken
-    ) Owned(_owner) {
+    ) payable Owned(_owner) {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
     }
 
     /* ========== VIEWS ========== */
-
-    function totalSupply() external view returns (uint256) {
-        return _totalSupply;
-    }
 
     function balanceOf(address account) external view returns (uint256) {
         return _balances[account];
@@ -61,20 +61,23 @@ contract StakingRewardsOptimized is IStakingRewards, RewardsDistributionRecipien
         return block.timestamp < periodFinish ? block.timestamp : periodFinish;
     }
 
-    function rewardPerToken() public view returns (uint256) {
+    function rewardPerToken() public view returns (uint256, uint256 _totalSupply) {
         //@audit stored TS in memory
-        uint256 _totalSupplyMem = _totalSupply;
-        if (_totalSupplyMem == 0) {
-            return rewardPerTokenStored;
+        _totalSupply = totalSupply;
+        //@audit handle non-zero case first
+        if (_totalSupply != 0) {
+          return
+            (rewardPerTokenStored + (
+                lastTimeRewardApplicable() - (lastUpdateTime) * (rewardRate) * (MULTIPLIER) / (_totalSupply)
+            ), _totalSupply);
+        } else {
+            return (rewardPerTokenStored, 0);
         }
-        return
-            rewardPerTokenStored + (
-                lastTimeRewardApplicable() - (lastUpdateTime) * (rewardRate) * (1e18) / (_totalSupplyMem)
-            );
     }
 
     function earned(address account) public view returns (uint256) {
-        return _balances[account] * (rewardPerToken() - (userRewardPerTokenPaid[account])) / (1e18) + (rewards[account]);
+        (uint256 _rewardPerToken,) = rewardPerToken();
+        return _balances[account] * (_rewardPerToken - (userRewardPerTokenPaid[account])) / (MULTIPLIER) + (rewards[account]);
     }
 
     function getRewardForDuration() external view returns (uint256) {
@@ -83,26 +86,36 @@ contract StakingRewardsOptimized is IStakingRewards, RewardsDistributionRecipien
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
-    function stake(uint256 amount) external nonReentrant notPaused updateReward(msg.sender) {
+    function stake(uint256 amount) external nonReentrant notPaused  {
+        uint256 _totalSupply = updateReward(msg.sender);
         require(amount > 0, "Cannot stake 0");
-        _totalSupply = _totalSupply + (amount);
-        _balances[msg.sender] = _balances[msg.sender] + (amount);
+        unchecked {
+            totalSupply = _totalSupply + (amount);
+            _balances[msg.sender] = _balances[msg.sender] + (amount);
+        }
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Staked(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) public nonReentrant updateReward(msg.sender) {
+    function withdraw(uint256 amount) public nonReentrant {
+        uint256 _totalSupply = updateReward(msg.sender);
         require(amount > 0, "Cannot withdraw 0");
-        _totalSupply = _totalSupply - (amount);
+        unchecked{
+            totalSupply = _totalSupply - (amount);
+        }
+        //@audit need to underflow if amount more than caller's balance
         _balances[msg.sender] = _balances[msg.sender] - (amount);
+
         stakingToken.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
 
-    function getReward() public nonReentrant updateReward(msg.sender) {
+    function getReward() public nonReentrant {
+        updateReward(msg.sender);
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
-            rewards[msg.sender] = 0;
+            //@audit delete instead of setting to 0
+            delete rewards[msg.sender];
             rewardsToken.safeTransfer(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
         }
@@ -115,13 +128,16 @@ contract StakingRewardsOptimized is IStakingRewards, RewardsDistributionRecipien
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    function notifyRewardAmount(uint256 reward) external override onlyRewardsDistribution updateReward(address(0)) {
+    function notifyRewardAmount(uint256 reward) external override onlyRewardsDistribution {
+        updateReward(msg.sender);
         if (block.timestamp >= periodFinish) {
             rewardRate = reward / (rewardsDuration);
         } else {
-            uint256 remaining = periodFinish - (block.timestamp);
-            uint256 leftover = remaining * (rewardRate);
-            rewardRate = reward + (leftover) / (rewardsDuration);
+          unchecked{
+              uint256 remaining = periodFinish - (block.timestamp);
+              uint256 leftover = remaining * (rewardRate);
+              rewardRate = reward + (leftover) / (rewardsDuration);
+          }
         }
 
         // Ensure the provided reward amount is not more than the balance in the contract.
@@ -154,14 +170,18 @@ contract StakingRewardsOptimized is IStakingRewards, RewardsDistributionRecipien
 
     /* ========== MODIFIERS ========== */
 
-    modifier updateReward(address account) {
-        rewardPerTokenStored = rewardPerToken();
+    //@audit changed from modifier to to private function, returns totalSupply which can be reused
+    function updateReward(address account) private returns (uint256) {
+        (uint256 _rewardPerTokenStored, uint256 _totalSupply) = rewardPerToken();
+        rewardPerTokenStored = _rewardPerTokenStored;
+
         lastUpdateTime = uint32(lastTimeRewardApplicable());
         if (account != address(0)) {
             rewards[account] = earned(account);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
+            userRewardPerTokenPaid[account] = _rewardPerTokenStored;
         }
-        _;
+
+        return _totalSupply;
     }
 
     /* ========== EVENTS ========== */
