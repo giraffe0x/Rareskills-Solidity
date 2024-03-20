@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ERC721 } from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { ERC721Royalty } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Royalty.sol";
 import { MerkleProof } from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import { BitMaps } from "@openzeppelin/contracts/utils/structs/BitMaps.sol";
 
-contract NFTWithMerkleDiscount is ERC721Royalty, Ownable2Step {
+contract NFTWithMerkleDiscount is ERC721Royalty, Ownable {
   BitMaps.BitMap private claimedBitMap;
 
   uint256 public constant MAX_SUPPLY = 20;
@@ -24,7 +24,7 @@ contract NFTWithMerkleDiscount is ERC721Royalty, Ownable2Step {
     address _receiver,
     uint96 _feeNumerator,
     bytes32 _merkleRoot
-  ) ERC721("NFT", "NFT") {
+  ) ERC721("NFT", "NFT") Ownable(msg.sender) {
     _setDefaultRoyalty(_receiver, _feeNumerator);
     merkleRoot = _merkleRoot;
 

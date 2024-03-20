@@ -8,7 +8,7 @@ import { Ownable } from  "@openzeppelin/contracts/access/Ownable.sol";
 contract Dex is Ownable {
   address public token1;
   address public token2;
-  constructor() {}
+  constructor() Ownable(msg.sender) {}
 
   function setTokens(address _token1, address _token2) public onlyOwner {
     token1 = _token1;

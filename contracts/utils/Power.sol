@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
 contract Power{
-    using SafeMath for uint256;
-
-
     uint256 private constant ONE = 1;
     uint32 private constant MAX_WEIGHT = 1000000;
     uint8 private constant MIN_PRECISION = 32;
@@ -873,11 +868,11 @@ contract Power{
         bool _lowerStake
     ) public view returns (uint32, uint32) {
         (_tq, _rp) = safeFactors(_tq, _rp);
-        uint256 f = _hi.mul(FIXED_1) / _lo;
+        uint256 f = _hi * (FIXED_1) / _lo;
         uint256 g = f < OPT_LOG_MAX_VAL ? optimalLog(f) : generalLog(f);
-        uint256 x = g.mul(_tq) / _rp;
+        uint256 x = g * (_tq) / _rp;
         uint256 y = _lowerStake ? lowerStake(x) : higherStake(x);
-        return normalizedWeights(y.mul(_tq), _rp.mul(FIXED_1));
+        return normalizedWeights(y * (_tq), _rp * (FIXED_1));
     }
 
     /**
@@ -922,7 +917,7 @@ contract Power{
             _a /= c;
             _b /= c;
         }
-        uint256 x = roundDiv(_a * MAX_WEIGHT, _a.add(_b));
+        uint256 x = roundDiv(_a * MAX_WEIGHT, _a + (_b));
         uint256 y = MAX_WEIGHT - x;
         return (uint32(x), uint32(y));
     }

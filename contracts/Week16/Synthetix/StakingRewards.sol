@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 // import "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
 import "@openzeppelin/contracts/token/ERC20/Utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // Inheritance
 import "./IStakingRewards.sol";

@@ -10,7 +10,7 @@ import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils
 import { Ownable2StepUpgradeable } from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-contract ERC20Token is ERC20Upgradeable, Ownable2StepUpgradeable, Initializable, UUPSUpgradeable {
+contract ERC20Token is ERC20Upgradeable, Ownable2StepUpgradeable, UUPSUpgradeable {
   /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
       _disableInitializers();
@@ -24,7 +24,7 @@ contract ERC20Token is ERC20Upgradeable, Ownable2StepUpgradeable, Initializable,
       _mint(msg.sender, 1000000 * 10 ** decimals());
 
       approvedMinters[msg.sender] = 1;
-      emit ApproveMinter(_minter);
+      emit ApproveMinter(msg.sender);
   }
 
   mapping(address => uint256) public approvedMinters;

@@ -2,7 +2,6 @@
 pragma solidity 0.8.21;
 
 import {Power} from "./Power.sol";
-import {SafeMath} from  "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 /*
     Bancor Formula interface
@@ -24,8 +23,6 @@ interface IBancorFormula {
 }
 
 contract BancorFormula is IBancorFormula, Power {
-    using SafeMath for uint256;
-
     uint256 private constant ONE = 1;
     uint32 private constant MAX_WEIGHT = 1000000;
     uint8 private constant MIN_PRECISION = 32;
@@ -64,18 +61,18 @@ contract BancorFormula is IBancorFormula, Power {
 
         // special case if the weight = 100%
         if (_reserveWeight == MAX_WEIGHT)
-            return _supply.mul(_amount) / _reserveBalance;
+            return _supply * (_amount) / _reserveBalance;
 
         uint256 result;
         uint8 precision;
-        uint256 baseN = _amount.add(_reserveBalance);
+        uint256 baseN = _amount + (_reserveBalance);
         (result, precision) = power(
             baseN,
             _reserveBalance,
             _reserveWeight,
             MAX_WEIGHT
         );
-        uint256 temp = _supply.mul(result) >> precision;
+        uint256 temp = _supply * (result) >> precision;
         return temp - _supply;
     }
 
@@ -116,13 +113,13 @@ contract BancorFormula is IBancorFormula, Power {
 
         // special case if the weight = 100%
         if (_reserveWeight == MAX_WEIGHT)
-            return _reserveBalance.mul(_amount) / _supply;
+            return _reserveBalance * (_amount) / _supply;
 
         uint256 result;
         uint8 precision;
         uint256 baseD = _supply - _amount;
         (result, precision) = power(_supply, baseD, MAX_WEIGHT, _reserveWeight);
-        uint256 temp1 = _reserveBalance.mul(result);
+        uint256 temp1 = _reserveBalance * (result);
         uint256 temp2 = _reserveBalance << precision;
         return (temp1 - temp2) / result;
     }

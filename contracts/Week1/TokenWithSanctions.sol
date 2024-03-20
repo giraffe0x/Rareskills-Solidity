@@ -11,7 +11,7 @@ contract TokenWithSanction is ERC20, Ownable {
 
   event Blacklisted(address indexed account);
 
-  constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {}
+  constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) Ownable(msg.sender) {}
 
   /**
     * @dev Creates a `value` amount of tokens and assigns them to `account`, by transferring it from address(0).

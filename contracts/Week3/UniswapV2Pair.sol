@@ -5,7 +5,7 @@ import { ERC20 } from "lib/solady/src/tokens/ERC20.sol";
 import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
 import { UniswapV2Library } from "./libraries/UniswapV2Library.sol";
 import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import { IWETH } from "./interfaces/IWETH.sol";
 import { IERC20 } from "./interfaces/IERC20.sol";

@@ -14,10 +14,10 @@ contract TokenWithGodMode is ERC20, Ownable {
     string memory _name,
     string memory _symbol,
     address _god
-  ) ERC20(_name, _symbol) {
+  ) ERC20(_name, _symbol) Ownable(msg.sender) {
       god = _god;
       _mint(_god, TOTAL_SUPPLY);
-    }
+  }
 
   modifier onlyGod {
     require(msg.sender == god, "Only god can call this function");
