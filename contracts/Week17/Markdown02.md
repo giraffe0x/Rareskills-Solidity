@@ -33,3 +33,15 @@ EOA -> proxy - delegatecall -> A - delegatecall -> B
 From A's perspective, msg.sender is EOA
 From B's perspective, msg.sender is EOA
 From proxy's perspective, msg.sender is EOA
+
+
+Contract addresses for Week 2 Upgradeable contracts (Sepolia)
+ERC20: 0x5E6EF812e9E450e0e7BaC8FFc6bb48De7a0B8055
+ERC20 Proxy:0x895FCC302f1435A22EDA9DF76De25590674BE929
+
+ERC721:0x8bCAb24375C75C55F2964b36508D442A8F535A17
+ERC721Proxy: 0x911d58A555265B2fF74392eB00ad7533334Abc86
+
+Staking: 0xC360B5e70602A431eEAff66f03634Da650A5241C
+StakingProxy: 0x97DFC8B13d41b665b850144a4b6c26E91F1D1c72
+StakingV2: 0x26Bea7F80AfB913b55EDBF008001248307547f41
